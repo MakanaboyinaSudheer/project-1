@@ -1,0 +1,9 @@
+# Libraries available to agent-generated experiment code (no network at runtime,
+# so everything the agent may import must be baked in here).
+numpy
+pandas
+scipy
+scikit-learn
+statsmodels
+matplotlib
+seaborn

@@ -1,0 +1,21 @@
+# Replace the @member-N placeholders with real GitHub usernames.
+# Shared contracts need review from everyone.
+/src/discovery_agent/schemas.py      @member-1 @member-2 @member-3
+/src/discovery_agent/graph/state.py  @member-1 @member-2 @member-3
+
+/src/discovery_agent/ingestion/      @member-1
+/src/discovery_agent/retrieval/      @member-1
+/src/discovery_agent/evaluation/     @member-1
+
+/src/discovery_agent/graph/          @member-2
+/src/discovery_agent/agents/         @member-2
+/src/discovery_agent/memory/         @member-2
+/src/discovery_agent/synthesis/      @member-2
+
+/src/discovery_agent/sandbox/        @member-3
+/src/discovery_agent/agents/code_executor.py  @member-3
+/src/discovery_agent/agents/debugger.py       @member-3
+/src/discovery_agent/telemetry/      @member-3
+/dashboard/                          @member-3
+/sandbox/                            @member-3
+/docker-compose.yml                  @member-3
