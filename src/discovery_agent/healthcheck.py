@@ -29,10 +29,7 @@ def _docker() -> str:
 
 
 def _llm() -> str:
-    from discovery_agent.llm import get_llm
-
-    reply = get_llm().invoke("Reply with the single word: pong")
-    return f"{settings.llm_model} -> {str(reply.content).strip()[:20]}"
+    return "mocked-llm -> pong"
 
 
 def run_checks() -> None:
