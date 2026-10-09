@@ -19,6 +19,7 @@ MODULES = [
     "discovery_agent.memory.manager",
     "discovery_agent.synthesis.latex",
     "discovery_agent.evaluation.grader",
+    "discovery_agent.telemetry.costs",
 ]
 
 
