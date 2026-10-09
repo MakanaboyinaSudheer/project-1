@@ -1,6 +1,6 @@
 """Shared data contracts between modules.
 
-Changing a model here affects every teammate: do it in its own PR, tag all three
+Changing a model here affects every teammate: do it in its own PR, tag all four
 members for review, and update MODULES.md in the same PR.
 """
 

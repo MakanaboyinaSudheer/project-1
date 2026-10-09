@@ -192,7 +192,7 @@ Jinja2 templates render `abstract.tex` (LaTeX `abstract` environment, `\cite{}` 
 [`schemas.py`](src/discovery_agent/schemas.py) and [`graph/state.py`](src/discovery_agent/graph/state.py)
 are the interfaces between the three work streams. While a module isn't built yet, teammates
 code against these types (and mock them in tests), so nobody blocks anyone else.
-Changing them requires a dedicated PR reviewed by all three members (enforced by CODEOWNERS).
+Changing them requires a dedicated PR reviewed by all four members (enforced by CODEOWNERS).
 
 ## 7. Security and safety notes
 - Secrets live only in `.env` (gitignored). The `detect-private-key` pre-commit hook guards against leaks.
