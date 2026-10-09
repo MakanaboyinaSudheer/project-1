@@ -24,10 +24,7 @@ class CostTracker(BaseCallbackHandler):
         self.events.append(
             CostEvent(
                 node=str(
-                    metadata.get("langgraph_node")
-                    or metadata.get("node")
-                    or kwargs.get("name")
-                    or "llm"
+                    metadata.get("langgraph_node") or metadata.get("node") or kwargs.get("name") or "llm"
                 ),
                 model=str(
                     output.get("model_name")
