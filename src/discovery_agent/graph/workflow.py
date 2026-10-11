@@ -20,6 +20,7 @@ import uuid
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 
+from discovery_agent.agents.literature_reviewer import literature_reviewer_node
 from discovery_agent.graph.state import ResearchState
 
 
@@ -51,7 +52,7 @@ def build_graph():
     """Return the compiled StateGraph with a SQLite checkpointer (resumable runs)."""
     workflow = StateGraph(ResearchState)
 
-    workflow.add_node("literature_reviewer", literature_reviewer_stub)
+    workflow.add_node("literature_reviewer", literature_reviewer_node)
     workflow.add_node("hypothesis_generator", hypothesis_generator_stub)
     workflow.add_node("code_executor", code_executor_stub)
     workflow.add_node("debugger", debugger_stub)
