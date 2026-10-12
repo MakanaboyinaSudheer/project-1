@@ -13,9 +13,7 @@ def test_fetch_at_least_ten_arxiv_papers():
         max_results=50,
     )
 
-    assert len(papers) >= 10, (
-        f"Expected at least 10 papers, but received {len(papers)}"
-    )
+    assert len(papers) >= 10, f"Expected at least 10 papers, but received {len(papers)}"
 
     assert all(paper.source == "arxiv" for paper in papers)
     assert all(paper.peer_reviewed is False for paper in papers)

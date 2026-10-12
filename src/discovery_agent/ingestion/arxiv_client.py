@@ -1,8 +1,6 @@
-
-
 import arxiv
-
 from tenacity import retry, stop_after_attempt, wait_exponential
+
 from discovery_agent.schemas import Paper
 
 
@@ -55,9 +53,7 @@ def fetch_arxiv(
 
     # Keep the newest papers first.
     papers.sort(
-        key=lambda paper: paper.published.timestamp()
-        if paper.published
-        else 0,
+        key=lambda paper: paper.published.timestamp() if paper.published else 0,
         reverse=True,
     )
 

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 from discovery_agent.ingestion.arxiv_client import fetch_arxiv
@@ -26,7 +26,7 @@ def make_arxiv_result(
 @patch("discovery_agent.ingestion.arxiv_client.arxiv.Client")
 def test_fetch_arxiv_converts_results_to_paper(mock_client_class):
     """Check that ArXiv results are converted to Paper objects."""
-    published = datetime(2026, 10, 10, tzinfo=timezone.utc)
+    published = datetime(2026, 10, 10, tzinfo=UTC)
     result = make_arxiv_result("2601.00001", ["cs.LG"], published)
 
     mock_client = mock_client_class.return_value
@@ -44,7 +44,7 @@ def test_fetch_arxiv_converts_results_to_paper(mock_client_class):
 @patch("discovery_agent.ingestion.arxiv_client.arxiv.Client")
 def test_fetch_arxiv_filters_categories(mock_client_class):
     """Check that papers outside the requested category are excluded."""
-    published = datetime(2026, 10, 10, tzinfo=timezone.utc)
+    published = datetime(2026, 10, 10, tzinfo=UTC)
 
     matching = make_arxiv_result("2601.00001", ["cs.LG"], published)
     non_matching = make_arxiv_result("2601.00002", ["math.AG"], published)
@@ -64,12 +64,12 @@ def test_fetch_arxiv_returns_newest_first(mock_client_class):
     older = make_arxiv_result(
         "2601.00001",
         ["cs.LG"],
-        datetime(2026, 1, 1, tzinfo=timezone.utc),
+        datetime(2026, 1, 1, tzinfo=UTC),
     )
     newer = make_arxiv_result(
         "2601.00002",
         ["cs.LG"],
-        datetime(2026, 9, 1, tzinfo=timezone.utc),
+        datetime(2026, 9, 1, tzinfo=UTC),
     )
 
     mock_client = mock_client_class.return_value
@@ -81,7 +81,8 @@ def test_fetch_arxiv_returns_newest_first(mock_client_class):
         "arxiv:2601.00002",
         "arxiv:2601.00001",
     ]
-    
+
+
 @patch("discovery_agent.ingestion.arxiv_client.arxiv.Client")
 def test_fetch_arxiv_retries_after_failure(mock_client_class, monkeypatch):
     """Check that Tenacity retries when an ArXiv request fails."""
