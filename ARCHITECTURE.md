@@ -149,7 +149,9 @@ Jinja2 templates render `abstract.tex` (LaTeX `abstract` environment, `\cite{}` 
 `paper.tex` / `draft.md` with a BibTeX bibliography generated from the citations.
 
 ### 4.8 Observability (`telemetry/`, `dashboard/`)
-- The `CostTracker` callback records tokens and USD per LLM call into `runs/<id>/costs.jsonl`.
+- The `CostTracker` callback records tokens and estimated USD per LLM call into
+  `runs/<id>/costs.jsonl`. Rates are USD per million tokens in `telemetry/costs.py`;
+  unlisted models are logged with a warning and a zero estimate until a rate is configured.
 - The dashboard reads the checkpoints and `runs/` to show: the run list, the logic tree (the trace),
   citations with links, code attempts with diffs and rewards, the critic report, and costs.
 
