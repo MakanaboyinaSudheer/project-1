@@ -1,6 +1,8 @@
 """Literature Reviewer node. Owner: Member 2 (Week 1)."""
 
-from discovery_agent.agents.prompts import LITERATURE_REVIEW_PROMPT
+from discovery_agent.agents.prompts import (
+    LITERATURE_REVIEW_PROMPT,
+)
 from discovery_agent.graph.state import ResearchState
 from discovery_agent.llm import get_llm
 
@@ -15,4 +17,7 @@ def literature_reviewer_node(state: ResearchState) -> dict:
     chain = LITERATURE_REVIEW_PROMPT | llm
     response = chain.invoke({"topic": topic, "context": mock_context_text})
 
-    return {"literature_context": [], "literature_summary": response.content}
+    return {
+        "literature_context": [],
+        "literature_summary": response.content,
+    }
