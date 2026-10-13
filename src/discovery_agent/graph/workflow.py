@@ -24,10 +24,6 @@ from discovery_agent.agents.literature_reviewer import literature_reviewer_node
 from discovery_agent.graph.state import ResearchState
 
 
-def literature_reviewer_stub(state: ResearchState):
-    return {"literature_context": []}
-
-
 def hypothesis_generator_stub(state: ResearchState):
     return {"hypothesis": None}
 
