@@ -2,6 +2,10 @@
 
 import argparse
 
+from discovery_agent.graph.workflow import run_discovery
+from discovery_agent.healthcheck import run_checks
+from discovery_agent.ingestion.pipeline import run_ingestion
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="discovery-agent")
@@ -20,16 +24,10 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "ingest":
-        from discovery_agent.ingestion.pipeline import run_ingestion
-
         run_ingestion(args.query, max_results=args.max_results)
     elif args.command == "run":
-        from discovery_agent.graph.workflow import run_discovery
-
         run_discovery(args.topic, thread_id=args.thread_id)
     elif args.command == "check":
-        from discovery_agent.healthcheck import run_checks
-
         run_checks()
 
 

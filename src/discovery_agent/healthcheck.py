@@ -1,6 +1,10 @@
 """`discovery-agent check` — confirms a teammate's environment matches the team setup."""
 
+import docker
+from pymilvus import MilvusClient
+
 from discovery_agent.config import settings
+from discovery_agent.llm import get_llm
 
 
 def _check(name: str, fn) -> bool:
@@ -14,23 +18,17 @@ def _check(name: str, fn) -> bool:
 
 
 def _milvus() -> str:
-    from pymilvus import MilvusClient
-
     client = MilvusClient(uri=settings.milvus_uri)
     return f"collections: {client.list_collections()}"
 
 
 def _docker() -> str:
-    import docker
-
     client = docker.from_env()
     client.images.get(settings.sandbox_image)
     return f"image {settings.sandbox_image} present"
 
 
 def _llm() -> str:
-    from discovery_agent.llm import get_llm
-
     reply = get_llm().invoke("Reply with the single word: pong")
     return f"{settings.llm_model} -> {str(reply.content).strip()[:20]}"
 
