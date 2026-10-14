@@ -17,4 +17,5 @@ def test_end_to_end_stub_run():
 
     assert "literature_context" in final_state
     assert "literature_summary" in final_state
+    assert "hypothesis" in final_state
     assert "code_attempts" in final_state
