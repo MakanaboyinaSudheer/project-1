@@ -129,21 +129,21 @@ def _run_summary(run: dict[str, Any]) -> str:
     )
 
 
-def _trace_dataframe(trace: list[Any]) -> pd.DataFrame:
-    rows = []
+def _trace_events(trace: list[Any]) -> list[dict[str, Any]]:
+    events = []
     for step, event in enumerate(trace, start=1):
         if isinstance(event, dict):
-            rows.append(
+            events.append(
                 {
                     "Step": step,
-                    "Node": event.get("node", "unknown"),
-                    "Summary": event.get("summary", ""),
-                    "Time": event.get("at", ""),
+                    "node": str(event.get("node", "unknown")),
+                    "summary": str(event.get("summary", "")),
+                    "time": str(event.get("at", "")),
                 }
             )
         else:
-            rows.append({"Step": step, "Node": "unknown", "Summary": str(event), "Time": ""})
-    return pd.DataFrame(rows, columns=["Step", "Node", "Summary", "Time"])
+            events.append({"Step": step, "node": "unknown", "summary": str(event), "time": ""})
+    return events
 
 
 def main() -> None:
@@ -204,7 +204,18 @@ def main() -> None:
         if not trace:
             st.info("No trace data is available for this run yet.")
         else:
-            st.dataframe(_trace_dataframe(trace), use_container_width=True, hide_index=True)
+            events = _trace_events(trace)
+            st.markdown("**Execution path**")
+            for index, event in enumerate(events):
+                with st.container(border=True):
+                    st.caption(f"STEP {event['Step']}")
+                    st.markdown(f"**{event['node']}**")
+                    if event["summary"]:
+                        st.write(event["summary"])
+                    if event["time"]:
+                        st.caption(f"Time: {event['time']}")
+                if index < len(events) - 1:
+                    st.markdown("↓")
             with st.expander("Raw trace data"):
                 st.json(trace)
 
