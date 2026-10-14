@@ -129,6 +129,23 @@ def _run_summary(run: dict[str, Any]) -> str:
     )
 
 
+def _trace_dataframe(trace: list[Any]) -> pd.DataFrame:
+    rows = []
+    for step, event in enumerate(trace, start=1):
+        if isinstance(event, dict):
+            rows.append(
+                {
+                    "Step": step,
+                    "Node": event.get("node", "unknown"),
+                    "Summary": event.get("summary", ""),
+                    "Time": event.get("at", ""),
+                }
+            )
+        else:
+            rows.append({"Step": step, "Node": "unknown", "Summary": str(event), "Time": ""})
+    return pd.DataFrame(rows, columns=["Step", "Node", "Summary", "Time"])
+
+
 def main() -> None:
     st.set_page_config(page_title="Discovery Agent", layout="wide")
     st.title("Autonomous Scientific Discovery Agent")
@@ -187,7 +204,9 @@ def main() -> None:
         if not trace:
             st.info("No trace data is available for this run yet.")
         else:
-            st.json(trace)
+            st.dataframe(_trace_dataframe(trace), use_container_width=True, hide_index=True)
+            with st.expander("Raw trace data"):
+                st.json(trace)
 
     with tabs[1]:
         literature = selected_run.get("literature", [])

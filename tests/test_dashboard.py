@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from dashboard.app import discover_runs  # noqa: E402
+from dashboard.app import _trace_dataframe, discover_runs  # noqa: E402
 
 
 def test_discover_runs_handles_missing_directory(tmp_path: Path) -> None:
@@ -70,3 +70,25 @@ def test_discover_runs_ignores_malformed_cost_records(tmp_path: Path) -> None:
     assert by_id["partial"]["cost_total_usd"] == 0.5
     assert by_id["partial"]["costs"] == [{"usd": 0.2}, {"usd": "invalid"}, {"usd": 0.3}]
     assert by_id["idle"]["status"] == "ready"
+
+
+def test_trace_dataframe_preserves_step_order_and_handles_incomplete_events() -> None:
+    trace = [
+        {"node": "literature_reviewer", "summary": "Found papers", "at": "2026-10-14T10:00:00Z"},
+        {"node": "hypothesis_generator", "summary": "Generated hypothesis"},
+        "unexpected trace entry",
+    ]
+
+    frame = _trace_dataframe(trace)
+
+    assert list(frame.columns) == ["Step", "Node", "Summary", "Time"]
+    assert frame.to_dict("records") == [
+        {
+            "Step": 1,
+            "Node": "literature_reviewer",
+            "Summary": "Found papers",
+            "Time": "2026-10-14T10:00:00Z",
+        },
+        {"Step": 2, "Node": "hypothesis_generator", "Summary": "Generated hypothesis", "Time": ""},
+        {"Step": 3, "Node": "unknown", "Summary": "unexpected trace entry", "Time": ""},
+    ]
