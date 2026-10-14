@@ -32,4 +32,5 @@ services:
     ports:
       - "8000:3000"
     depends_on:
-      - milvus
+      milvus:
+        condition: service_healthy

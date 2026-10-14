@@ -19,6 +19,9 @@ echo "==> Building sandbox image"
 docker build -t discovery-sandbox:latest sandbox/
 
 echo "==> Starting Milvus"
-docker compose up -d
+docker compose up -d --wait --wait-timeout 180
+
+echo "==> Verifying infrastructure"
+docker compose ps
 
 echo "Done. Activate with: source .venv/bin/activate ; then run: discovery-agent check"

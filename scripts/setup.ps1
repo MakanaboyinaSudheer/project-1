@@ -19,6 +19,11 @@ Write-Host "==> Building sandbox image"
 docker build -t discovery-sandbox:latest sandbox/
 
 Write-Host "==> Starting Milvus"
-docker compose up -d
+docker compose up -d --wait --wait-timeout 180
+if ($LASTEXITCODE -ne 0) {
+    throw "Milvus did not become healthy. Inspect with: docker compose ps"
+}
 
+Write-Host "==> Verifying infrastructure"
+docker compose ps
 Write-Host "Done. Activate with: .\.venv\Scripts\Activate.ps1 ; then run: discovery-agent check"
