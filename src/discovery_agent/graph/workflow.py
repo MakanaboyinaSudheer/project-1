@@ -20,12 +20,9 @@ import uuid
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 
+from discovery_agent.agents.hypothesis_generator import hypothesis_generator_node
 from discovery_agent.agents.literature_reviewer import literature_reviewer_node
 from discovery_agent.graph.state import ResearchState
-
-
-def hypothesis_generator_stub(state: ResearchState):
-    return {"hypothesis": None}
 
 
 def code_executor_stub(state: ResearchState):
@@ -49,7 +46,7 @@ def build_graph():
     workflow = StateGraph(ResearchState)
 
     workflow.add_node("literature_reviewer", literature_reviewer_node)
-    workflow.add_node("hypothesis_generator", hypothesis_generator_stub)
+    workflow.add_node("hypothesis_generator", hypothesis_generator_node)
     workflow.add_node("code_executor", code_executor_stub)
     workflow.add_node("debugger", debugger_stub)
     workflow.add_node("critic", critic_stub)

@@ -7,8 +7,8 @@ LITERATURE_REVIEW_PROMPT = ChatPromptTemplate.from_messages(
         (
             "system",
             "You are an expert AI research scientist. Synthesize the provided "
-            "literature into a concise foundational review. Identify key findings "
-            "and critical research gaps based on the context.",
+            "literature into a concise foundational review. You must identify "
+            "key findings and critical research gaps based on the context.",
         ),
         ("user", "Topic: {topic}\n\nLiterature Context:\n{context}"),
     ]
