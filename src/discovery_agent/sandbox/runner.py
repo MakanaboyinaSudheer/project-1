@@ -1,6 +1,7 @@
 """Execute generated Python code in a disposable Docker container."""
 
 import json
+import os
 import time
 from contextlib import suppress
 from pathlib import Path
@@ -52,6 +53,7 @@ def run_code(code: str, run_dir: Path, timeout_s: int | None = None) -> Executio
     output_dir = attempt_dir / "output"
     workspace_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
+    os.chmod(output_dir, 0o777)
     (workspace_dir / "main.py").write_text(code, encoding="utf-8")
 
     client = docker.from_env()
@@ -67,6 +69,15 @@ def run_code(code: str, run_dir: Path, timeout_s: int | None = None) -> Executio
                 str(workspace_dir): {"bind": "/workspace", "mode": "ro"},
                 str(output_dir): {"bind": "/output", "mode": "rw"},
             },
+            network_disabled=True,
+            read_only=True,
+            tmpfs={"/tmp": "rw,noexec,nosuid,size=64m"},
+            cap_drop=["ALL"],
+            security_opt=["no-new-privileges:true"],
+            user="10001:10001",
+            pids_limit=128,
+            mem_limit=settings.sandbox_mem_limit,
+            nano_cpus=int(settings.sandbox_cpus * 1_000_000_000),
         )
         try:
             result = container.wait(timeout=timeout)

@@ -77,6 +77,15 @@ def test_run_code_collects_logs_metrics_and_artifacts(tmp_path, monkeypatch) -> 
     assert client.closed is True
     assert client.containers.kwargs["command"] == ["/workspace/main.py"]
     assert client.containers.kwargs["volumes"][str(attempt_dir / "workspace")]["bind"] == "/workspace"
+    assert client.containers.kwargs["network_disabled"] is True
+    assert client.containers.kwargs["read_only"] is True
+    assert client.containers.kwargs["tmpfs"] == {"/tmp": "rw,noexec,nosuid,size=64m"}
+    assert client.containers.kwargs["cap_drop"] == ["ALL"]
+    assert client.containers.kwargs["security_opt"] == ["no-new-privileges:true"]
+    assert client.containers.kwargs["user"] == "10001:10001"
+    assert client.containers.kwargs["pids_limit"] == 128
+    assert client.containers.kwargs["mem_limit"] == runner.settings.sandbox_mem_limit
+    assert client.containers.kwargs["nano_cpus"] == int(runner.settings.sandbox_cpus * 1_000_000_000)
     assert (attempt_dir / "workspace" / "main.py").read_text(encoding="utf-8") == "print('hello')"
 
 
