@@ -35,7 +35,10 @@ def _read_costs(path: Path) -> tuple[float, list[dict[str, Any]]]:
         for line in path.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
-            item = json.loads(line)
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
             if not isinstance(item, dict):
                 continue
             records.append(item)
@@ -59,9 +62,19 @@ def discover_runs(base_dir: str | Path = DEFAULT_RUNS_DIR) -> list[dict[str, Any
         return []
 
     runs: list[dict[str, Any]] = []
-    for run_dir in sorted(root.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+    for run_dir in root.iterdir():
         if not run_dir.is_dir():
             continue
+
+        try:
+            updated_at = run_dir.stat().st_mtime
+        except FileNotFoundError:
+            continue
+        for artifact in run_dir.iterdir():
+            try:
+                updated_at = max(updated_at, artifact.stat().st_mtime)
+            except FileNotFoundError:
+                continue
 
         state = _read_json(run_dir / "state.json")
         trace = state.get("trace", []) if isinstance(state, dict) else []
@@ -96,7 +109,7 @@ def discover_runs(base_dir: str | Path = DEFAULT_RUNS_DIR) -> list[dict[str, Any
                 "thread_id": run_dir.name,
                 "path": str(run_dir),
                 "status": status,
-                "updated_at": run_dir.stat().st_mtime,
+                "updated_at": updated_at,
                 "trace": trace if isinstance(trace, list) else [],
                 "attempts": attempts if isinstance(attempts, list) else [],
                 "critic_report": critic_report if isinstance(critic_report, dict) else {},
@@ -106,22 +119,27 @@ def discover_runs(base_dir: str | Path = DEFAULT_RUNS_DIR) -> list[dict[str, Any
             }
         )
 
-    return runs
+    return sorted(runs, key=lambda run: run["updated_at"], reverse=True)
 
 
 def _run_summary(run: dict[str, Any]) -> str:
-    return f"{run.get('thread_id', 'unknown')} · {run.get('status', 'ready')} · ${run.get('cost_total_usd', 0.0):.3f}"
+    return (
+        f"{run.get('thread_id', 'unknown')} · {run.get('status', 'ready')} · "
+        f"${run.get('cost_total_usd', 0.0):.3f}"
+    )
 
 
 def main() -> None:
     st.set_page_config(page_title="Discovery Agent", layout="wide")
     st.title("Autonomous Scientific Discovery Agent")
-    st.caption("Day 3 dashboard: run list, trace, citations, attempts, critic review, and cost overview")
+    st.caption("Browse discovery runs and review their status and summary metrics.")
 
     runs = discover_runs()
 
     if not runs:
-        st.info("No run artifacts were found yet. Launch the discovery workflow to populate the runs/ directory.")
+        st.info(
+            "No run artifacts were found yet. Launch the discovery workflow to populate the runs/ directory."
+        )
         with st.expander("Expected run layout"):
             st.code(
                 """
