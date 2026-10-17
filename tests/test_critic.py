@@ -58,6 +58,50 @@ def test_statistical_checks_supports_single_metric_fields() -> None:
 
 
 @pytest.mark.parametrize(
+    ("plural_key", "singular_key", "plural_value", "singular_value"),
+    [
+        ("p_values", "p_value", 0.01, 0.02),
+        ("confidence_intervals", "confidence_interval", [0.1, 0.9], [0.2, 0.8]),
+        ("effect_sizes", "effect_size", 0.5, 0.6),
+    ],
+)
+def test_statistical_checks_reports_conflicting_singular_and_primary_metrics(
+    plural_key: str, singular_key: str, plural_value: object, singular_value: object
+) -> None:
+    metrics = {
+        "p_values": {"primary": 0.01},
+        "tests": {"primary": "t_test"},
+        "effect_sizes": {"primary": 0.5},
+        plural_key: {"primary": plural_value},
+        singular_key: singular_value,
+    }
+
+    report = statistical_checks(_result(metrics))
+
+    assert report.verdict == "invalid"
+    assert any(f"`{plural_key}.primary` conflicts with `{singular_key}`" in issue for issue in report.issues)
+
+
+def test_statistical_checks_accepts_matching_primary_and_singular_metrics() -> None:
+    report = statistical_checks(
+        _result(
+            {
+                "p_values": {"primary": 0.01},
+                "p_value": 0.01,
+                "tests": {"primary": "t_test"},
+                "confidence_intervals": {"primary": [0.1, 0.9]},
+                "confidence_interval": (0.1, 0.9),
+                "effect_sizes": {"primary": 0.5},
+                "effect_size": 0.5,
+            }
+        )
+    )
+
+    assert report.verdict == "significant"
+    assert report.issues == []
+
+
+@pytest.mark.parametrize(
     ("metrics", "issue_fragment"),
     [
         ({"p_values": {"primary": 1.1}}, "P-value"),

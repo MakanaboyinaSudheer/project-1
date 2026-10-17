@@ -28,6 +28,21 @@ def _named_values(
 
     singular = metrics.get(singular_key)
     if singular is not None:
+        primary = values.get("primary")
+        if "primary" in values:
+            if (
+                plural_key == "confidence_intervals"
+                and isinstance(primary, (list, tuple))
+                and isinstance(singular, (list, tuple))
+            ):
+                differs = tuple(primary) != tuple(singular)
+            else:
+                differs = primary != singular
+            if differs:
+                issues.append(
+                    f"`{plural_key}.primary` conflicts with `{singular_key}`; "
+                    "the named primary value is retained."
+                )
         values.setdefault("primary", singular)
 
     return values, issues
