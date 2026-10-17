@@ -20,25 +20,13 @@ import uuid
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 
+from discovery_agent.agents.code_executor import code_executor_node
+from discovery_agent.agents.critic import critic_node
+from discovery_agent.agents.debugger import debugger_node
 from discovery_agent.agents.hypothesis_generator import hypothesis_generator_node
 from discovery_agent.agents.literature_reviewer import literature_reviewer_node
+from discovery_agent.agents.synthesizer import synthesizer_node
 from discovery_agent.graph.state import ResearchState
-
-
-def code_executor_stub(state: ResearchState):
-    return {"code_attempts": []}
-
-
-def debugger_stub(state: ResearchState):
-    return {}
-
-
-def critic_stub(state: ResearchState):
-    return {"final_report": None}
-
-
-def synthesizer_stub(state: ResearchState):
-    return {}
 
 
 def build_graph():
@@ -47,10 +35,10 @@ def build_graph():
 
     workflow.add_node("literature_reviewer", literature_reviewer_node)
     workflow.add_node("hypothesis_generator", hypothesis_generator_node)
-    workflow.add_node("code_executor", code_executor_stub)
-    workflow.add_node("debugger", debugger_stub)
-    workflow.add_node("critic", critic_stub)
-    workflow.add_node("synthesizer", synthesizer_stub)
+    workflow.add_node("code_executor", code_executor_node)
+    workflow.add_node("debugger", debugger_node)
+    workflow.add_node("critic", critic_node)
+    workflow.add_node("synthesizer", synthesizer_node)
 
     workflow.set_entry_point("literature_reviewer")
     workflow.add_edge("literature_reviewer", "hypothesis_generator")
