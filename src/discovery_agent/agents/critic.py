@@ -33,8 +33,25 @@ def _named_values(
     return values, issues
 
 
+def _holm_bonferroni(p_values: dict[str, float]) -> dict[str, float]:
+    ordered = sorted(p_values.items(), key=lambda item: item[1])
+    adjusted: dict[str, float] = {}
+    running_max = 0.0
+    count = len(ordered)
+    for index, (name, p_value) in enumerate(ordered):
+        running_max = max(running_max, (count - index) * p_value)
+        adjusted[name] = min(1.0, running_max)
+    return {name: adjusted[name] for name in p_values}
+
+
 def statistical_checks(result: ExecutionResult, alpha: float = 0.05) -> CriticReport:
-    """Validate p-values, confidence intervals, and effect sizes in execution metrics."""
+    """Validate metrics, apply Holm-Bonferroni, and classify the execution result.
+
+    `tests` and `effect_sizes` map outcome names to values. `sample_sizes` is an
+    optional outcome-to-count mapping; `test`, `test_name`, `sample_size`, `n`,
+    `effect_size`, and singular metric fields support a single primary outcome.
+    The report's p-values are Holm-Bonferroni-adjusted when multiple are present.
+    """
     if not _finite_number(alpha) or not 0 < alpha < 1:
         raise ValueError("alpha must be a finite number strictly between 0 and 1.")
 
@@ -90,23 +107,61 @@ def statistical_checks(result: ExecutionResult, alpha: float = 0.05) -> CriticRe
     if not p_values:
         issues.append("Metrics must include at least one valid p-value.")
 
+    raw_tests = metrics.get("tests", metrics.get("test_names"))
+    if raw_tests is None:
+        raw_tests = {}
+    if not isinstance(raw_tests, Mapping):
+        issues.append("`tests` must be an object mapping outcome names to test names.")
+        raw_tests = {}
+    tests = dict(raw_tests)
+    singular_test = metrics.get("test", metrics.get("test_name"))
+    if singular_test is not None:
+        tests.setdefault("primary", singular_test)
+    for name in p_values:
+        test_name = tests.get(name)
+        if not isinstance(test_name, str) or not test_name.strip():
+            issues.append(f"P-value for `{name}` is missing a named statistical test.")
+
+    raw_sample_sizes = metrics.get("sample_sizes")
+    if raw_sample_sizes is None:
+        raw_sample_sizes = {}
+    if not isinstance(raw_sample_sizes, Mapping):
+        issues.append("`sample_sizes` must be an object mapping outcome names to counts.")
+        raw_sample_sizes = {}
+    sample_sizes = dict(raw_sample_sizes)
+    singular_sample_size = metrics.get("sample_size", metrics.get("n"))
+    if singular_sample_size is not None:
+        sample_sizes.setdefault("primary", singular_sample_size)
+    for name, sample_size in sample_sizes.items():
+        if not isinstance(name, str) or not name.strip():
+            issues.append("Each sample size must have a non-empty outcome name.")
+        elif not isinstance(sample_size, int) or isinstance(sample_size, bool) or sample_size < 1:
+            issues.append(f"Sample size for `{name}` must be a positive integer.")
+        elif sample_size < 30:
+            issues.append(f"Small sample size for `{name}` (n={sample_size} < 30).")
+
+    for name in p_values:
+        if name not in effect_sizes:
+            issues.append(f"Effect size for `{name}` is missing.")
+
+    adjusted_p_values = _holm_bonferroni(p_values)
     invalid = bool(issues)
     verdict = (
         "invalid"
         if invalid
         else "significant"
-        if any(value < alpha for value in p_values.values())
+        if any(value < alpha for value in adjusted_p_values.values())
         else "not_significant"
     )
     summary = {
-        "significant": f"At least one p-value is below alpha={alpha:g}.",
-        "not_significant": f"No p-value is below alpha={alpha:g}.",
+        "significant": f"At least one Holm-Bonferroni-adjusted p-value is below alpha={alpha:g}.",
+        "not_significant": f"No Holm-Bonferroni-adjusted p-value is below alpha={alpha:g}.",
         "invalid": "Metrics failed deterministic validation.",
     }[verdict]
 
     return CriticReport(
         verdict=verdict,
-        p_values=p_values,
+        p_values=adjusted_p_values,
         confidence_intervals=confidence_intervals,
         effect_sizes=effect_sizes,
         issues=issues,

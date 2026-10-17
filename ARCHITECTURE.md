@@ -133,6 +133,10 @@ All dependencies are baked into the image, because there is no network at runtim
 1. **Deterministic stage:** parse `metrics.json`, recompute or validate p-values and CIs
    with scipy where the raw data is present, apply Holm-Bonferroni across multiple tests,
    flag n < 30, missing effect sizes, and p-values without a named test.
+   Metrics use `p_values`, `tests`, and `effect_sizes` objects keyed by outcome name;
+   `sample_sizes` is optional and uses the same shape. A single primary outcome may use
+   `p_value`, `test`/`test_name`, `effect_size`, and `sample_size`/`n`. The deterministic
+   report's `p_values` contains Holm-Bonferroni-adjusted values.
 2. **LLM stage:** review the methodology (leakage, confounders, whether the test matches
    the hypothesis). The LLM can add issues but **cannot override** numbers from stage 1.
 3. Output: a `CriticReport` with the verdict `significant | not_significant | invalid`.

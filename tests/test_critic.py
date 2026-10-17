@@ -23,22 +23,32 @@ def test_statistical_checks_parses_and_classifies_named_metrics() -> None:
         _result(
             {
                 "p_values": {"primary": 0.01, "secondary": 0.2},
+                "tests": {"primary": "welch_t_test", "secondary": "mann_whitney_u"},
                 "confidence_intervals": {"primary": [0.2, 0.8]},
-                "effect_sizes": {"primary": 0.5},
+                "effect_sizes": {"primary": 0.5, "secondary": 0.2},
+                "sample_sizes": {"primary": 40, "secondary": 35},
             }
         )
     )
 
     assert report.verdict == "significant"
-    assert report.p_values == {"primary": 0.01, "secondary": 0.2}
+    assert report.p_values == {"primary": 0.02, "secondary": 0.2}
     assert report.confidence_intervals == {"primary": (0.2, 0.8)}
-    assert report.effect_sizes == {"primary": 0.5}
+    assert report.effect_sizes == {"primary": 0.5, "secondary": 0.2}
     assert report.issues == []
 
 
 def test_statistical_checks_supports_single_metric_fields() -> None:
     report = statistical_checks(
-        _result({"p_value": 0.05, "confidence_interval": [-1, 1], "effect_size": 0.0})
+        _result(
+            {
+                "p_value": 0.05,
+                "test": "one_sample_t_test",
+                "confidence_interval": [-1, 1],
+                "effect_size": 0.0,
+                "sample_size": 30,
+            }
+        )
     )
 
     assert report.verdict == "not_significant"
@@ -72,8 +82,9 @@ def test_statistical_checks_requires_valid_alpha(alpha: float) -> None:
 
 
 def test_statistical_checks_rejects_failed_or_timed_out_execution() -> None:
-    assert statistical_checks(_result({"p_value": 0.01}, exit_code=1)).verdict == "invalid"
-    assert statistical_checks(_result({"p_value": 0.01}, timed_out=True)).verdict == "invalid"
+    metrics = {"p_value": 0.01, "test": "t_test", "effect_size": 0.5}
+    assert statistical_checks(_result(metrics, exit_code=1)).verdict == "invalid"
+    assert statistical_checks(_result(metrics, timed_out=True)).verdict == "invalid"
 
 
 def test_critic_node_reports_missing_attempt() -> None:
@@ -86,9 +97,69 @@ def test_critic_node_reports_missing_attempt() -> None:
 def test_critic_node_reviews_latest_attempt() -> None:
     state = ResearchState(
         attempts=[
-            CodeAttempt(iteration=1, code="", result=_result({"p_value": 0.01}), reward=0.0),
-            CodeAttempt(iteration=2, code="", result=_result({"p_value": 0.5}), reward=0.0),
+            CodeAttempt(
+                iteration=1,
+                code="",
+                result=_result({"p_value": 0.01, "test": "t_test", "effect_size": 0.5}),
+                reward=0.0,
+            ),
+            CodeAttempt(
+                iteration=2,
+                code="",
+                result=_result({"p_value": 0.5, "test": "t_test", "effect_size": 0.5}),
+                reward=0.0,
+            ),
         ]
     )
 
     assert critic_node(state)["critic_report"].verdict == "not_significant"
+
+
+def test_statistical_checks_applies_holm_bonferroni_before_verdict() -> None:
+    report = statistical_checks(
+        _result(
+            {
+                "p_values": {"first": 0.02, "second": 0.04, "third": 0.03},
+                "tests": {
+                    "first": "t_test",
+                    "second": "t_test",
+                    "third": "t_test",
+                },
+                "effect_sizes": {"first": 0.5, "second": 0.2, "third": 0.3},
+            }
+        )
+    )
+
+    assert report.verdict == "not_significant"
+    assert report.p_values == {"first": 0.06, "second": 0.06, "third": 0.06}
+    assert "Holm-Bonferroni-adjusted" in report.summary
+
+
+def test_statistical_checks_flags_small_sample_sizes() -> None:
+    report = statistical_checks(
+        _result(
+            {
+                "p_value": 0.001,
+                "test": "t_test",
+                "effect_size": 0.8,
+                "sample_size": 29,
+            }
+        )
+    )
+
+    assert report.verdict == "invalid"
+    assert any("Small sample size" in issue for issue in report.issues)
+
+
+@pytest.mark.parametrize(
+    ("metadata", "issue_fragment"),
+    [
+        ({"effect_size": 0.4}, "missing a named statistical test"),
+        ({"test": "t_test"}, "Effect size"),
+    ],
+)
+def test_statistical_checks_requires_test_name_and_effect_size(metadata: dict, issue_fragment: str) -> None:
+    report = statistical_checks(_result({"p_value": 0.01, **metadata}))
+
+    assert report.verdict == "invalid"
+    assert any(issue_fragment in issue for issue in report.issues)
