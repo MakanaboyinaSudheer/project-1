@@ -4,7 +4,7 @@ Changing a model here affects every teammate: do it in its own PR, tag all four
 members for review, and update MODULES.md in the same PR.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -59,6 +59,7 @@ class ExecutionResult(BaseModel):
     timed_out: bool = False
     artifacts: dict[str, str] = Field(default_factory=dict)  # filename -> path on host
     metrics: dict = Field(default_factory=dict)  # parsed from /output/metrics.json
+    resource_usage: dict[str, float | int] = Field(default_factory=dict)
 
 
 class CodeAttempt(BaseModel):
@@ -83,4 +84,4 @@ class CostEvent(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     usd: float = 0.0
-    at: datetime = Field(default_factory=datetime.utcnow)
+    at: datetime = Field(default_factory=lambda: datetime.now(UTC))

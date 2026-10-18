@@ -17,6 +17,45 @@ Each row below is the minimum you push that day. Extra commits are welcome.
 Use the module ID in branch names (`feature/M1.2-pubmed-client`) and commit scopes (`feat(M1.2): ...`).
 Interfaces are already stubbed in `src/`. Implement each one behind its existing signature.
 
+## Verified implementation status — 18 Oct 2026
+
+This snapshot reflects the current working branch, not every unmerged feature branch. “Implemented”
+means code and focused local tests exist; it does not imply a live service, provider, release, or
+acceptance run was available. “Partial” means implementation exists but at least one stated
+acceptance criterion remains unverified or incomplete.
+
+| Module | Status | Remaining acceptance evidence |
+|---|---|---|
+| M1.1 ArXiv client | Implemented | Live fetch of at least 10 papers is not run. |
+| M1.2 PubMed client | Implemented | Live Entrez fetch is not run. |
+| M1.3 Embeddings + Milvus | Partial | Milvus integration/schema/index behavior not run; local PyTorch DLL blocks embedding inference. |
+| M1.4 Ingestion pipeline | Partial | Idempotence has a mocked test; real Milvus ingestion and scheduling are not verified. |
+| M1.5 RAG retriever | Partial | Peer-review filter is unit-tested; the planned 20-query recall evaluation is not run. |
+| M1.6 PDF parser | Partial | Text chunking is tested; live download and full PDF/figure extraction coverage remain. |
+| M1.7 Figure parser | Partial | VLM request behavior is mocked; five-paper multimodal retrieval is not verified. |
+| M1.8 Vector indexing + benchmarks | Partial | Recall/latency benchmark helper exists; labeled benchmark corpus and index tuning report are absent. |
+| M2.1 LangGraph workflow | Partial | SQLite-backed successful workflow is tested with mocked nodes; restart-from-interruption is not verified. |
+| M2.2 Literature reviewer | Implemented | Provider-backed end-to-end run is not run. |
+| M2.3 Hypothesis generator | Implemented | Citation IDs and quoted evidence validation are unit-tested; provider-backed run is not run. |
+| M2.4 Memory manager | Partial | Context budgeting/compression are tested; crash recovery and long-run acceptance test remain. |
+| M2.5 Refinement loop + policy | Partial | Bounded refinement/routing and persisted bandit code exist; three-turn stress/convergence tests remain. |
+| M2.6 State machine verification | Incomplete | Exhaustive transition/deadlock tests and state-machine specification are absent. |
+| M3.1 CI + infrastructure | Implemented | CI workflow, setup scripts, and Compose health checks exist; full remote CI result is not asserted here. |
+| M3.2 Sandbox runner | Partial | Hardening and runner behavior are unit-tested with a fake Docker client; real Docker stress/resource run remains. |
+| M3.3 Code Executor | Partial | Generation/execution orchestration is unit-tested with mocks; live LLM + Docker integration is not run. |
+| M3.4 Sandbox security suite | Incomplete | Planned escape-test suite and security audit evidence are absent. |
+| M3.5 Self-debug loop | Partial | Error classification, rewards, strategy persistence, and debugger are implemented; convergence/online-update stress tests remain. |
+| M3.6 Platform runbook | Partial | Runbook exists; clean-install verification and security-audit evidence are absent. |
+| M4.1 Cost telemetry | Implemented | Callback persistence and pricing calculations have focused tests; live provider usage is not run. |
+| M4.2 Dashboard | Partial | Run, trace, citations, attempts/diffs, costs, refresh, and export paths are implemented; browser walkthrough is not verified. |
+| M4.3 Statistical Critic | Partial | Deterministic checks and methodology-review wiring exist; the LLM review is tested with a mock, not a live provider. |
+| M4.4 Synthesizer + LaTeX | Partial | Templates and artifact rendering are unit-tested; LaTeX compilation is not verified. |
+| M4.5 Holdout evaluation | Partial | Grader and ingestion exclusion are implemented; the required 10-paper `data/holdout.jsonl` dataset and real grading run are absent. |
+
+The 20-day rows below are a planned commit schedule, not a verified activity ledger. Current Git
+history cannot establish that every member made one meaningful commit per day or that scheduled
+milestones/releases occurred.
+
 ---
 
 ## Daily commit schedule
@@ -230,4 +269,3 @@ M1.6 ─► M1.7 ─► richer M2.2 retrieval
 M4.3 & M4.4 plug into M2.1 graph routing
 ```
 Until an upstream module lands, code against `schemas.py` and use mocks.
-

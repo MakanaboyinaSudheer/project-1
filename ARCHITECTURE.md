@@ -112,6 +112,7 @@ and runs it in `discovery-sandbox:latest` with:
 | Resources | `mem_limit` 2g, `nano_cpus` 1 CPU, `pids_limit` 128 |
 | Time | wall-clock timeout, then the container is killed and removed |
 | Interpreter | `python -I` (isolated mode) |
+| Monitoring | Docker-reported peak memory and CPU usage are recorded with each execution result |
 
 The contract for experiments: code writes its results to `/output/metrics.json`
 (e.g. `{"test": "t-test", "p_value": 0.01, "ci_95": [0.1, 0.4], "effect_size": 0.6, "n": 200}`)

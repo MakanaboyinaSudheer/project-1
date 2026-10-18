@@ -6,6 +6,7 @@ launched during early project stages and still provide a useful empty-state view
 
 from __future__ import annotations
 
+import difflib
 import json
 from pathlib import Path
 from typing import Any
@@ -146,11 +147,7 @@ def _trace_events(trace: list[Any]) -> list[dict[str, Any]]:
     return events
 
 
-def main() -> None:
-    st.set_page_config(page_title="Discovery Agent", layout="wide")
-    st.title("Autonomous Scientific Discovery Agent")
-    st.caption("Browse discovery runs and review their status and summary metrics.")
-
+def _render_dashboard() -> None:
     runs = discover_runs()
 
     if not runs:
@@ -196,6 +193,20 @@ def main() -> None:
     selected_id = st.sidebar.selectbox("Select run", [run["thread_id"] for run in runs])
     selected_run = next(run for run in runs if run["thread_id"] == selected_id)
     st.sidebar.write(_run_summary(selected_run))
+    st.sidebar.download_button(
+        "Export run JSON",
+        data=json.dumps(selected_run, indent=2, default=str),
+        file_name=f"{selected_id}.json",
+        mime="application/json",
+    )
+    draft_path = Path(selected_run["path"]) / "draft.md"
+    if draft_path.is_file():
+        st.sidebar.download_button(
+            "Export paper draft",
+            data=draft_path.read_text(encoding="utf-8"),
+            file_name=f"{selected_id}-draft.md",
+            mime="text/markdown",
+        )
 
     tabs = st.tabs(["Trace", "Citations", "Attempts", "Critic", "Costs"])
 
@@ -224,7 +235,18 @@ def main() -> None:
         if not literature:
             st.info("No literature citations were recorded for this run yet.")
         else:
-            st.dataframe(pd.json_normalize(literature), use_container_width=True)
+            for item in literature:
+                if not isinstance(item, dict):
+                    continue
+                metadata = item.get("metadata", {})
+                title = metadata.get("title", item.get("paper_id", "Paper"))
+                url = metadata.get("url")
+                if url:
+                    st.markdown(f"[{title}]({url})")
+                else:
+                    st.markdown(f"**{title}**")
+                st.caption(f"{item.get('paper_id', '')} · {item.get('kind', 'abstract')}")
+                st.write(item.get("text", ""))
 
     with tabs[2]:
         attempts = selected_run.get("attempts", [])
@@ -232,6 +254,31 @@ def main() -> None:
             st.info("No code attempts are available for this run yet.")
         else:
             st.dataframe(pd.json_normalize(attempts), use_container_width=True)
+            rewards = [
+                float(item["reward"])
+                for item in attempts
+                if isinstance(item, dict) and isinstance(item.get("reward"), (int, float))
+            ]
+            if rewards:
+                st.line_chart({"Reward": rewards})
+            for previous, current in zip(attempts, attempts[1:], strict=False):
+                if not isinstance(previous, dict) or not isinstance(current, dict):
+                    continue
+                before = previous.get("code", "").splitlines()
+                after = current.get("code", "").splitlines()
+                diff = "\n".join(
+                    difflib.unified_diff(
+                        before,
+                        after,
+                        fromfile=f"attempt-{previous.get('iteration', '?')}",
+                        tofile=f"attempt-{current.get('iteration', '?')}",
+                        lineterm="",
+                    )
+                )
+                with st.expander(
+                    f"Code changes: attempt {previous.get('iteration')} → {current.get('iteration')}"
+                ):
+                    st.code(diff or "No code changes.", language="diff")
 
     with tabs[3]:
         critic_report = selected_run.get("critic_report", {})
@@ -246,6 +293,22 @@ def main() -> None:
             st.info("No cost records are available for this run yet.")
         else:
             st.dataframe(pd.json_normalize(cost_rows), use_container_width=True)
+            cost_frame = pd.DataFrame(cost_rows)
+            if {"model", "usd"}.issubset(cost_frame.columns):
+                by_model = cost_frame.groupby("model", as_index=True)["usd"].sum()
+                st.bar_chart(by_model)
+
+
+def main() -> None:
+    st.set_page_config(page_title="Discovery Agent", layout="wide")
+
+    @st.fragment(run_every=15)
+    def render_dashboard() -> None:
+        st.title("Autonomous Scientific Discovery Agent")
+        st.caption("Browse discovery runs and review their status and summary metrics.")
+        _render_dashboard()
+
+    render_dashboard()
 
 
 if __name__ == "__main__":

@@ -24,6 +24,21 @@ class FakeContainer:
     def logs(self, *, stdout: bool, stderr: bool) -> bytes:
         return b"standard output\n" if stdout else b"standard error\n"
 
+    def stats(self, *, stream: bool) -> dict:
+        assert stream is False
+        return {
+            "memory_stats": {"max_usage": 1024, "limit": 2048},
+            "cpu_stats": {
+                "cpu_usage": {"total_usage": 200, "percpu_usage": [100, 100]},
+                "system_cpu_usage": 2000,
+                "online_cpus": 2,
+            },
+            "precpu_stats": {
+                "cpu_usage": {"total_usage": 100, "percpu_usage": [50, 50]},
+                "system_cpu_usage": 1000,
+            },
+        }
+
     def kill(self) -> None:
         self.killed = True
 
@@ -72,6 +87,11 @@ def test_run_code_collects_logs_metrics_and_artifacts(tmp_path, monkeypatch) -> 
     assert result.stderr == "standard error\n"
     assert result.timed_out is False
     assert result.metrics == {"p_value": 0.01}
+    assert result.resource_usage == {
+        "memory_peak_bytes": 1024,
+        "memory_limit_bytes": 2048,
+        "cpu_percent": 20.0,
+    }
     assert set(result.artifacts) == {"metrics.json", "plot.png"}
     assert container.removed is True
     assert client.closed is True

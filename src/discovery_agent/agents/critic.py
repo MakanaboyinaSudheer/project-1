@@ -2,12 +2,17 @@
 
 import math
 from collections.abc import Mapping
+from typing import Literal, TypeGuard
 
-from discovery_agent.graph.state import ResearchState
+from pydantic import BaseModel, Field
+
+from discovery_agent.graph.state import ResearchState, trace_event
+from discovery_agent.llm import get_llm
+from discovery_agent.sandbox.feedback import update_strategy
 from discovery_agent.schemas import CriticReport, ExecutionResult
 
 
-def _finite_number(value: object) -> bool:
+def _finite_number(value: object) -> TypeGuard[int | float]:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
@@ -161,7 +166,7 @@ def statistical_checks(result: ExecutionResult, alpha: float = 0.05) -> CriticRe
 
     adjusted_p_values = _holm_bonferroni(p_values)
     invalid = bool(issues)
-    verdict = (
+    verdict: Literal["significant", "not_significant", "invalid"] = (
         "invalid"
         if invalid
         else "significant"
@@ -195,4 +200,45 @@ def critic_node(state: ResearchState) -> dict:
         )
     else:
         report = statistical_checks(attempts[-1].result)
-    return {"critic_report": report}
+    hypothesis = state.get("hypothesis")
+    if attempts and hypothesis is not None:
+
+        class MethodologyReview(BaseModel):
+            issues: list[str] = Field(description="Methodology flaws or an empty list")
+            summary: str = Field(description="Concise methodology review")
+
+        review_result = (
+            get_llm()
+            .with_structured_output(MethodologyReview)
+            .invoke(
+                [
+                    (
+                        "system",
+                        "Review the experiment for data leakage, confounding, sample selection, and "
+                        "whether the statistical test matches the hypothesis. Do not recalculate or "
+                        "change any reported p-values, confidence intervals, effect sizes, or verdict.",
+                    ),
+                    (
+                        "human",
+                        f"Hypothesis: {hypothesis.model_dump_json()}\n"
+                        f"Execution metrics: {attempts[-1].result.metrics!r}\n"
+                        f"Deterministic critic: {report.model_dump_json()}",
+                    ),
+                ]
+            )
+        )
+        review = MethodologyReview.model_validate(review_result)
+        report = report.model_copy(
+            update={
+                "issues": [*report.issues, *review.issues],
+                "summary": f"{report.summary} Methodology review: {review.summary}",
+            }
+        )
+    strategy = state.get("debug_strategy")
+    if attempts and strategy and attempts[-1].result.exit_code == 0 and not attempts[-1].result.timed_out:
+        score = {"significant": 1.0, "not_significant": 0.5, "invalid": 0.0}[report.verdict]
+        update_strategy(strategy, score - 0.05 * (len(attempts) - 1))
+    return {
+        "critic_report": report,
+        "trace": [trace_event("critic", f"Deterministic verdict: {report.verdict}.")],
+    }

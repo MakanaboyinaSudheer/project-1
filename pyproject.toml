@@ -55,6 +55,9 @@ discovery-agent = "discovery_agent.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"discovery_agent.synthesis" = ["templates/*.j2"]
+
 [tool.ruff]
 line-length = 110
 target-version = "py311"

@@ -42,6 +42,37 @@ def _collect_artifacts(output_dir: Path) -> tuple[dict[str, str], dict]:
     return artifacts, metrics
 
 
+def _collect_resource_usage(container) -> dict[str, float | int]:
+    stats = container.stats(stream=False)
+    memory = stats.get("memory_stats", {})
+    cpu = stats.get("cpu_stats", {})
+    previous_cpu = stats.get("precpu_stats", {})
+    memory_usage = memory.get("max_usage", memory.get("usage"))
+    memory_limit = memory.get("limit")
+    cpu_usage = cpu.get("cpu_usage", {}).get("total_usage")
+    previous_usage = previous_cpu.get("cpu_usage", {}).get("total_usage")
+    system_usage = cpu.get("system_cpu_usage")
+    previous_system_usage = previous_cpu.get("system_cpu_usage")
+    online_cpus = cpu.get("online_cpus") or len(cpu.get("cpu_usage", {}).get("percpu_usage", []))
+
+    resource_usage: dict[str, float | int] = {}
+    if isinstance(memory_usage, int) and isinstance(memory_limit, int):
+        resource_usage["memory_peak_bytes"] = memory_usage
+        resource_usage["memory_limit_bytes"] = memory_limit
+    if all(
+        isinstance(value, int)
+        for value in (cpu_usage, previous_usage, system_usage, previous_system_usage, online_cpus)
+    ):
+        cpu_delta = cpu_usage - previous_usage
+        system_delta = system_usage - previous_system_usage
+        if system_delta > 0:
+            resource_usage["cpu_percent"] = round(
+                (cpu_delta / system_delta) * online_cpus * 100,
+                2,
+            )
+    return resource_usage
+
+
 def run_code(code: str, run_dir: Path, timeout_s: int | None = None) -> ExecutionResult:
     """Run code and collect its output, exit status, and files written to ``/output``."""
     timeout = settings.sandbox_timeout_s if timeout_s is None else timeout_s
@@ -91,6 +122,7 @@ def run_code(code: str, run_dir: Path, timeout_s: int | None = None) -> Executio
         stdout = _decode_logs(container, stdout=True)
         stderr = _decode_logs(container, stdout=False)
         artifacts, metrics = _collect_artifacts(output_dir)
+        resource_usage = _collect_resource_usage(container)
         return ExecutionResult(
             exit_code=exit_code,
             stdout=stdout,
@@ -99,6 +131,7 @@ def run_code(code: str, run_dir: Path, timeout_s: int | None = None) -> Executio
             timed_out=timed_out,
             artifacts=artifacts,
             metrics=metrics,
+            resource_usage=resource_usage,
         )
     finally:
         if container is not None:

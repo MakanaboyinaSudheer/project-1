@@ -45,7 +45,8 @@ docker compose up -d                       # start Milvus
 discovery-agent ingest --query "protein folding"
 discovery-agent run --topic "..."          # full discovery loop
 streamlit run dashboard/app.py             # supervisor dashboard
-pytest -m "not integration"                # unit tests
+discovery-agent evaluate --run-dir runs/<thread-id> # holdout evaluation (requires data/holdout.jsonl)
+pytest -m "not integration"               # unit tests
 pytest -m integration                      # needs Docker + Milvus
 docker compose down                        # stop Milvus (data persists in ./volumes)
 ```
