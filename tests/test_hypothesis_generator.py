@@ -20,14 +20,14 @@ def test_reject_hallucinated_citations(mock_get_llm, mock_prompt):
         title="Attempt 1: Bad",
         reasoning="Includes a fake citation",
         proposed_methodology="Mock methodology",
-        citations=["valid_paper_1", "hallucinated_paper_99"],  # Invalid ID
+        citations=["valid_paper_1", "hallucinated_paper_99"],
     )
 
     valid_output = Hypothesis(
         title="Attempt 2: Good",
         reasoning="Only valid citations",
         proposed_methodology="Mock methodology",
-        citations=["valid_paper_2"],  # Valid ID
+        citations=["valid_paper_2"],
     )
 
     mock_chain = MagicMock()

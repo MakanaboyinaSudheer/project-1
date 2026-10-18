@@ -21,8 +21,8 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 
 from discovery_agent.agents.code_executor import code_executor_node
-from discovery_agent.agents.critic import critic_node
-from discovery_agent.agents.debugger import debugger_node
+from discovery_agent.agents.critic import critic_node, route_after_critic
+from discovery_agent.agents.debugger import debugger_node, route_after_execution
 from discovery_agent.agents.hypothesis_generator import hypothesis_generator_node
 from discovery_agent.agents.literature_reviewer import literature_reviewer_node
 from discovery_agent.agents.synthesizer import synthesizer_node
@@ -55,16 +55,6 @@ def build_graph():
     memory = SqliteSaver(conn)
 
     return workflow.compile(checkpointer=memory)
-
-
-def route_after_execution(state: ResearchState) -> str:
-    """'debug' if the last attempt failed and budget remains, 'critic' if it succeeded, else 'fail'."""
-    return "critic"
-
-
-def route_after_critic(state: ResearchState) -> str:
-    """'synthesize' if significant, otherwise 'refine' (back to hypothesis generator)."""
-    return "synthesizer"
 
 
 def run_discovery(topic: str, thread_id: str | None = None) -> dict:
