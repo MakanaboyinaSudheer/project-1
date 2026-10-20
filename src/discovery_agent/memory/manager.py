@@ -56,5 +56,18 @@ def build_context(state: ResearchState, budget_tokens: int = 12000) -> str:
 
 
 def compress(state: ResearchState) -> dict:
-    """Compress older attempts/trace into state['memory_summary']. Pending Day 12."""
-    raise NotImplementedError
+    """Compress older attempts/trace into state['memory_summary']."""
+    code_attempts = state.get("code_attempts", [])
+    current_summary = state.get("memory_summary", "")
+
+    if len(code_attempts) <= 2:
+        return {}
+
+    attempts_to_compress = code_attempts[:-2]
+    recent_attempts = code_attempts[-2:]
+    compressed_text = "\n".join(
+        [f"Archived Attempt: {str(attempt)[:300]}..." for attempt in attempts_to_compress]
+    )
+    new_summary = current_summary + "\n" + compressed_text if current_summary else compressed_text
+
+    return {"memory_summary": new_summary.strip(), "code_attempts": recent_attempts}
