@@ -68,3 +68,22 @@ def run_discovery(topic: str, thread_id: str | None = None) -> dict:
     initial_state = {"research_topic": topic}
 
     return graph.invoke(initial_state, config=config)
+
+
+def get_run_status(thread_id: str) -> dict | None:
+    """Retrieve the latest state of a specific run for recovery monitoring."""
+    graph = build_graph()
+    config = {"configurable": {"thread_id": thread_id}}
+
+    state_snapshot = graph.get_state(config)
+    if state_snapshot and hasattr(state_snapshot, "values"):
+        return state_snapshot.values
+    return None
+
+
+def resume_discovery(thread_id: str) -> dict:
+    """Resume a suspended or crashed discovery workflow from its last checkpoint."""
+    graph = build_graph()
+    config = {"configurable": {"thread_id": thread_id}}
+
+    return graph.invoke(None, config=config)
