@@ -146,13 +146,11 @@ def _trace_dataframe(trace: list[Any]) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["Step", "Node", "Summary", "Time"])
 
 
-def main() -> None:
-    st.set_page_config(page_title="Discovery Agent", layout="wide")
-    st.title("Autonomous Scientific Discovery Agent")
-    st.caption("Browse discovery runs and review their status and summary metrics.")
+def _serialize_run(run: dict[str, Any]) -> str:
+    return json.dumps(run, indent=2, default=str)
 
-    runs = discover_runs()
 
+def _render_runs(runs: list[dict[str, Any]]) -> None:
     if not runs:
         st.info(
             "No run artifacts were found yet. Launch the discovery workflow to populate the runs/ directory."
@@ -196,6 +194,20 @@ def main() -> None:
     selected_id = st.sidebar.selectbox("Select run", [run["thread_id"] for run in runs])
     selected_run = next(run for run in runs if run["thread_id"] == selected_id)
     st.sidebar.write(_run_summary(selected_run))
+    st.sidebar.download_button(
+        "Export run JSON",
+        data=_serialize_run(selected_run),
+        file_name=f"{selected_id}.json",
+        mime="application/json",
+    )
+    draft_path = Path(selected_run["path"]) / "draft.md"
+    if draft_path.is_file():
+        st.sidebar.download_button(
+            "Export paper draft",
+            data=draft_path.read_text(encoding="utf-8"),
+            file_name=f"{selected_id}-draft.md",
+            mime="text/markdown",
+        )
 
     tabs = st.tabs(["Trace", "Citations", "Attempts", "Critic", "Costs"])
 
@@ -235,6 +247,27 @@ def main() -> None:
             st.info("No cost records are available for this run yet.")
         else:
             st.dataframe(pd.json_normalize(cost_rows), use_container_width=True)
+
+
+def main() -> None:
+    st.set_page_config(page_title="Discovery Agent", layout="wide")
+    st.title("Autonomous Scientific Discovery Agent")
+    st.caption("Browse discovery runs and review their status and summary metrics.")
+
+    refresh_intervals = {"Off": None, "5 seconds": 5, "15 seconds": 15}
+    refresh_interval = st.sidebar.selectbox(
+        "Auto-refresh",
+        options=list(refresh_intervals),
+        index=2,
+    )
+    if st.sidebar.button("Refresh now"):
+        st.rerun()
+
+    @st.fragment(run_every=refresh_intervals[refresh_interval])
+    def render_dashboard() -> None:
+        _render_runs(discover_runs())
+
+    render_dashboard()
 
 
 if __name__ == "__main__":

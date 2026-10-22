@@ -3,11 +3,37 @@ import os
 import sys
 from pathlib import Path
 
+from streamlit.testing.v1 import AppTest
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from dashboard.app import _trace_dataframe, discover_runs  # noqa: E402
+from dashboard.app import _serialize_run, _trace_dataframe, discover_runs  # noqa: E402
+
+
+def test_serialize_run_exports_run_data_as_json() -> None:
+    run = {"thread_id": "run-1", "updated_at": Path("artifact").resolve()}
+
+    exported = json.loads(_serialize_run(run))
+
+    assert exported == {"thread_id": "run-1", "updated_at": str(run["updated_at"])}
+
+
+def test_dashboard_exposes_refresh_and_run_exports(tmp_path: Path, monkeypatch) -> None:
+    run_dir = tmp_path / "runs" / "sample-run"
+    run_dir.mkdir(parents=True)
+    (run_dir / "state.json").write_text(json.dumps({"status": "succeeded"}), encoding="utf-8")
+    (run_dir / "draft.md").write_text("# Sample draft", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    app = AppTest.from_file(str(ROOT / "dashboard" / "app.py")).run()
+
+    assert not app.exception
+    assert any(item.label == "Auto-refresh" for item in app.selectbox)
+    assert any(item.label == "Refresh now" for item in app.button)
+    download_labels = [item.label for item in app.sidebar if item.type == "download_button"]
+    assert download_labels == ["Export run JSON", "Export paper draft"]
 
 
 def test_discover_runs_handles_missing_directory(tmp_path: Path) -> None:
