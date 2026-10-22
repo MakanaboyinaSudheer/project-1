@@ -137,6 +137,11 @@ All dependencies are baked into the image, because there is no network at runtim
    the hypothesis). The LLM can add issues but **cannot override** numbers from stage 1.
 3. Output: a `CriticReport` with the verdict `significant | not_significant | invalid`.
 
+When raw samples are available, `metrics.json` may include a `raw_data` object keyed by
+outcome, with `control` and `treatment` numeric arrays. The critic recomputes the p-value
+and confidence interval for `welch_t_test` and `paired_t_test`; reported values that
+disagree are flagged, and the recomputed values are used in the report.
+
 ### 4.6 Memory and long runs (`memory/`)
 - A LangGraph `SqliteSaver` checkpointer stores state per `thread_id` after every node,
   so a run survives crashes and restarts (`discovery-agent run --thread-id <id>`).

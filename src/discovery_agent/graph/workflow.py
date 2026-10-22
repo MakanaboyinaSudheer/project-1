@@ -15,6 +15,8 @@ Owner: Member 2. Node implementations live in discovery_agent.agents.*.
 
 from discovery_agent.graph.state import ResearchState
 
+MAX_REFINEMENTS = 3
+
 
 def build_graph():
     """Return the compiled StateGraph with a SQLite checkpointer (resumable runs)."""
@@ -27,8 +29,13 @@ def route_after_execution(state: ResearchState) -> str:
 
 
 def route_after_critic(state: ResearchState) -> str:
-    """'synthesize' if significant, otherwise 'refine' (back to hypothesis generator)."""
-    raise NotImplementedError("Week 3 - Member 2")
+    """Route significant results to synthesis and retry other verdicts up to the refinement limit."""
+    report = state.get("critic_report")
+    if report is None:
+        return "failed"
+    if report.verdict == "significant":
+        return "synthesize"
+    return "refine" if state.get("refinement_iteration", 0) < MAX_REFINEMENTS else "failed"
 
 
 def run_discovery(topic: str, thread_id: str | None = None) -> ResearchState:

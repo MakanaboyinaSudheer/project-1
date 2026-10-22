@@ -1,6 +1,7 @@
 """LangGraph state shared by every agent node."""
 
 import operator
+from datetime import UTC, datetime
 from typing import Annotated, Literal, TypedDict
 
 from discovery_agent.schemas import (
@@ -27,6 +28,7 @@ class ResearchState(TypedDict, total=False):
     code: str
     attempts: Annotated[list[CodeAttempt], operator.add]
     debug_iteration: int
+    refinement_iteration: int
 
     # Critic
     critic_report: CriticReport
@@ -40,3 +42,7 @@ class ResearchState(TypedDict, total=False):
     trace: Annotated[list[dict], operator.add]  # {"node", "summary", "at"}
     costs: Annotated[list[CostEvent], operator.add]
     memory_summary: str  # rolling compressed context (Week 3)
+
+
+def trace_event(node: str, summary: str) -> dict[str, str]:
+    return {"node": node, "summary": summary, "at": datetime.now(UTC).isoformat()}
