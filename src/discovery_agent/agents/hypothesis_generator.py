@@ -1,4 +1,4 @@
-"""Hypothesis Generator node, grounded in peer-reviewed literature via RAG. Owner: Member 2 (Week 2)."""
+"""Hypothesis Generator node, grounded in peer-reviewed literature via RAG. Owner: Member 2."""
 
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
@@ -21,15 +21,16 @@ HYPOTHESIS_PROMPT = ChatPromptTemplate.from_messages(
         (
             "system",
             "You are an expert AI researcher. Formulate a novel, testable hypothesis "
-            "based on the literature summary. If critic feedback is provided, refine "
-            "your previous hypothesis to address the flaws. ONLY cite source IDs explicitly "
-            "provided in the Valid Context IDs list.",
+            "based on the literature summary. If a previous hypothesis and critic feedback "
+            "are provided, you MUST explicitly refine the previous hypothesis to address the flaws. "
+            "ONLY cite source IDs explicitly provided in the Valid Context IDs list.",
         ),
         (
             "user",
             "Topic: {topic}\n\n"
             "Valid Context IDs: {context_ids}\n\n"
             "Literature Summary:\n{summary}\n\n"
+            "Previous Hypothesis:\n{previous_hypothesis}\n\n"
             "Critic Feedback:\n{feedback}\n\n"
             "{validation_errors}",
         ),
@@ -43,6 +44,8 @@ def hypothesis_generator_node(state: ResearchState) -> dict:
     topic = state.get("research_topic", "")
     summary = state.get("literature_summary", "")
     feedback = state.get("final_report", "None")
+
+    previous_hypothesis = state.get("hypothesis") or "None"
 
     literature_context = state.get("literature_context", [])
     valid_ids = {item.get("id") for item in literature_context if isinstance(item, dict) and "id" in item}
@@ -63,6 +66,7 @@ def hypothesis_generator_node(state: ResearchState) -> dict:
                 "topic": topic,
                 "context_ids": list(valid_ids),
                 "summary": summary,
+                "previous_hypothesis": previous_hypothesis,
                 "feedback": feedback,
                 "validation_errors": validation_errors,
             }
