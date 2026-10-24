@@ -150,8 +150,14 @@ disagree are flagged, and the recomputed values are used in the report.
 - `memory.compress` folds older attempts and trace entries into `memory_summary`.
 
 ### 4.7 Synthesis (`synthesis/`)
-Jinja2 templates render `abstract.tex` (LaTeX `abstract` environment, `\cite{}` keys) and
-`paper.tex` / `draft.md` with a BibTeX bibliography generated from the citations.
+Jinja2 templates render `abstract.tex` (LaTeX `abstract` environment, `\cite{}` keys),
+`paper.tex`, `refs.bib`, and `draft.md` from the hypothesis, final experiment metrics,
+literature, and critic report. User-provided text is escaped for LaTeX/Markdown output.
+The reported result is taken from the highest-reward execution attempt (latest iteration
+breaks ties).
+When a `thread_id` is present, the synthesizer writes all four artifacts to
+`runs/<thread_id>/`; it rejects unsafe run IDs and returns the abstract and Markdown draft
+in the graph state.
 
 ### 4.8 Observability (`telemetry/`, `dashboard/`)
 - The `CostTracker` callback records model, graph node, input/output tokens, estimated USD,
@@ -162,10 +168,15 @@ Jinja2 templates render `abstract.tex` (LaTeX `abstract` environment, `\cite{}` 
   citations with links, code attempts with diffs and rewards, the critic report, and costs.
 
 ### 4.9 Evaluation (`evaluation/`)
-- The holdout set is recent human-authored papers, excluded from ingestion by ID and date cutoff.
-- The agent runs on each holdout paper's topic and its output is graded on: similarity of the
-  hypothesis to the paper's findings (embeddings plus an LLM judge), citation validity,
-  experiment success rate, statistical validity, and cost per run.
+- `data/holdout.jsonl` contains ten recent arXiv papers and concise summaries.
+  `evaluation.holdout.exclude_holdout_papers` removes matching IDs before ingestion; M1.4
+  must call this helper before embedding or indexing candidates. The current ingestion pipeline
+  is still a stub, so end-to-end exclusion awaits that integration.
+- `discovery-agent grade --run-dir runs/<id>` evaluates a completed run against that fixed set.
+  It records embedding cosine similarity, a structured 0–5 LLM evidence-alignment score per
+  paper, peer-reviewed citation validity, experiment success rate, critic verdict validity,
+  and accumulated run cost in `runs/<id>/grade.json`.
+- Grading requires the configured sentence-transformer model and an available configured LLM.
 
 ## 5. Repository layout
 

@@ -1,0 +1,28 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{cite}
+\title{ {{- statement -}} }
+\begin{document}
+\maketitle
+\begin{abstract}
+{{ rationale }} {{ expected_outcome }}{% if citation_keys %} \cite{ {{- citation_keys | join(",") -}} }{% endif %}
+\end{abstract}
+\section{Background}
+{{ summary }}
+{% for item in literature %}
+\paragraph{ {{- item.title -}} } ({{ item.paper_id }}) {{ item.text }}
+{% endfor %}
+\section{Hypothesis and Rationale}
+{{ statement }}
+
+{{ rationale }}
+\section{Methods}
+{{ test_plan }}
+\section{Results}
+The final attempt reported: {{ metrics }} The deterministic critic verdict was {{ verdict }}.
+{% for issue in issues %}
+\paragraph{Review issue} {{ issue }}
+{% endfor %}
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}

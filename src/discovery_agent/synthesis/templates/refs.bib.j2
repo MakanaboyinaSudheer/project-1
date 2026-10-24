@@ -1,0 +1,6 @@
+{% for citation in citations %}
+@misc{ {{- citation.key -}},
+  title = { {{- citation.title -}} },
+  note = {Paper ID: {{ citation.paper_id }}}
+}
+{% endfor %}

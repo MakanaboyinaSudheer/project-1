@@ -215,7 +215,11 @@ Interfaces are already stubbed in `src/`. Implement each one behind its existing
 - `agents/synthesizer.py`, `synthesis/latex.py`, `synthesis/templates/*.j2` → `abstract.tex`, `paper.tex`, `refs.bib`, `draft.md`. LaTeX compilation verification.
 
 **M4.5 Holdout set & grader (Days 14–16, 18)**
-- `evaluation/holdout.py`, `evaluation/grader.py`, `data/holdout.jsonl`. 10 recent papers excluded from ingestion. LLM-judge scoring, metrics (`runs/<id>/grade.json`), and evaluation report.
+- `evaluation/holdout.py`, `evaluation/grader.py`, `data/holdout.jsonl`. Exclude holdout IDs
+  before ingestion; the M1.4 pipeline must call `exclude_holdout_papers`. Grade saved runs
+  with embedding similarity, 0–5 LLM-judge scoring, citation validity, experiment success,
+  statistical validity, and cost; persist results to `runs/<id>/grade.json`.
+- Run with `discovery-agent grade --run-dir runs/<id>`; requires configured embeddings and LLM.
 
 ---
 
@@ -230,4 +234,3 @@ M1.6 ─► M1.7 ─► richer M2.2 retrieval
 M4.3 & M4.4 plug into M2.1 graph routing
 ```
 Until an upstream module lands, code against `schemas.py` and use mocks.
-

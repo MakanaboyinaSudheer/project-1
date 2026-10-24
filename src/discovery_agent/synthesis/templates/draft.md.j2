@@ -1,0 +1,23 @@
+# {{ title }}
+
+## Abstract
+{{ rationale }} {{ expected_outcome }}
+
+## Methods
+{{ test_plan }}
+
+## Results
+{{ metrics_fence }}
+json
+{{ metrics_json }}
+{{ metrics_fence }}
+
+## Statistical review
+{{ critic_summary }}
+
+## References
+{% for citation in citations %}
+- {{ citation.title }} ({{ citation.paper_id }}): "{{ citation.quote }}"
+{% else %}
+No citations were provided.
+{% endfor %}

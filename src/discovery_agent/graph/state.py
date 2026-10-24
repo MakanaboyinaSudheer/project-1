@@ -16,6 +16,7 @@ from discovery_agent.schemas import (
 class ResearchState(TypedDict, total=False):
     # Input
     topic: str
+    thread_id: str
 
     # Literature Reviewer
     literature: list[RetrievedChunk]
