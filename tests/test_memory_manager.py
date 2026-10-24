@@ -24,14 +24,21 @@ def test_rolling_compression():
 def test_resume_after_kill():
     """M2.4: Verify SQLite checkpointer saves and retrieves thread state."""
     thread_id = str(uuid.uuid4())
+
     conn = sqlite3.connect(":memory:", check_same_thread=False)
     memory = SqliteSaver(conn)
+    memory.setup()
 
-    config = {"configurable": {"thread_id": thread_id}}
-    checkpoint_data = {"test_key": "persisted_value"}
+    config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
+    checkpoint_data = {
+        "v": 1,
+        "ts": "2026-10-24T00:00:00.000000+00:00",
+        "id": str(uuid.uuid4()),
+        "channel_values": {"test_key": "persisted_value"},
+    }
 
-    memory.put(config, checkpoint_data, {}, {})
-    recovered_checkpoint = memory.get_tuple(config)
+    memory.put(config, checkpoint_data, {"source": "input", "step": 1, "writes": {}}, {})
 
-    assert recovered_checkpoint is not None
-    assert recovered_checkpoint.checkpoint["test_key"] == "persisted_value"
+    retrieved = memory.get_tuple(config)
+    assert retrieved is not None
+    assert retrieved.checkpoint["channel_values"]["test_key"] == "persisted_value"

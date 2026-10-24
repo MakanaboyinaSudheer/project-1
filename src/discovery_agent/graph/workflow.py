@@ -21,15 +21,46 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 
 from discovery_agent.agents.code_executor import code_executor_node
-from discovery_agent.agents.critic import critic_node, route_after_critic
-from discovery_agent.agents.debugger import debugger_node, route_after_execution
+from discovery_agent.agents.critic import critic_node
+from discovery_agent.agents.debugger import debugger_node
 from discovery_agent.agents.hypothesis_generator import hypothesis_generator_node
 from discovery_agent.agents.literature_reviewer import literature_reviewer_node
 from discovery_agent.agents.synthesizer import synthesizer_node
 from discovery_agent.graph.state import ResearchState
 
 
-def build_graph():
+def route_after_execution(state: ResearchState) -> str:
+    """Route to debugger on error, or critic on success."""
+    code_attempts = state.get("code_attempts", [])
+
+    if not code_attempts:
+        return "critic"
+
+    last_attempt = code_attempts[-1]
+
+    if isinstance(last_attempt, dict) and (last_attempt.get("error") or not last_attempt.get("success")):
+        if len(code_attempts) >= 5:
+            return "critic"
+        return "debugger"
+
+    return "critic"
+
+
+def route_after_critic(state: ResearchState) -> str:
+    """Route based on critic evaluation.
+
+    Returns 'synthesizer' if the results are significant/valid.
+    Returns 'hypothesis_generator' to refine the hypothesis otherwise.
+    """
+    if state.get("is_significant") or state.get("passed_checks"):
+        return "synthesizer"
+    if len(state.get("code_attempts", [])) >= 5:
+        return "synthesizer"
+
+    return "hypothesis_generator"
+
+
+def build_graph(db_path: str = "volumes/checkpoints.sqlite"):
     """Return the compiled StateGraph with a SQLite checkpointer (resumable runs)."""
     workflow = StateGraph(ResearchState)
 
@@ -50,30 +81,39 @@ def build_graph():
     workflow.add_conditional_edges("critic", route_after_critic)
     workflow.add_edge("synthesizer", END)
 
-    os.makedirs("volumes", exist_ok=True)
-    conn = sqlite3.connect("volumes/checkpoints.sqlite", check_same_thread=False)
+    if db_path != ":memory:":
+        os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
+
+    conn = sqlite3.connect(db_path, check_same_thread=False)
     memory = SqliteSaver(conn)
 
     return workflow.compile(checkpointer=memory)
 
 
-def run_discovery(topic: str, thread_id: str | None = None) -> dict:
+def run_discovery(
+    topic: str,
+    thread_id: str | None = None,
+    db_path: str = "volumes/checkpoints.sqlite",
+) -> dict:
     """Execute the discovery workflow for a given topic."""
     if not thread_id:
         thread_id = str(uuid.uuid4())
 
-    graph = build_graph()
-    config = {"configurable": {"thread_id": thread_id}}
+    graph = build_graph(db_path=db_path)
+    config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
 
     initial_state = {"research_topic": topic}
 
     return graph.invoke(initial_state, config=config)
 
 
-def get_run_status(thread_id: str) -> dict | None:
+def get_run_status(
+    thread_id: str,
+    db_path: str = "volumes/checkpoints.sqlite",
+) -> dict | None:
     """Retrieve the latest state of a specific run for recovery monitoring."""
-    graph = build_graph()
-    config = {"configurable": {"thread_id": thread_id}}
+    graph = build_graph(db_path=db_path)
+    config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
 
     state_snapshot = graph.get_state(config)
     if state_snapshot and hasattr(state_snapshot, "values"):
@@ -81,9 +121,12 @@ def get_run_status(thread_id: str) -> dict | None:
     return None
 
 
-def resume_discovery(thread_id: str) -> dict:
+def resume_discovery(
+    thread_id: str,
+    db_path: str = "volumes/checkpoints.sqlite",
+) -> dict:
     """Resume a suspended or crashed discovery workflow from its last checkpoint."""
-    graph = build_graph()
-    config = {"configurable": {"thread_id": thread_id}}
+    graph = build_graph(db_path=db_path)
+    config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
 
     return graph.invoke(None, config=config)
