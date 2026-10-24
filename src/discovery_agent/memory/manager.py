@@ -27,7 +27,7 @@ def build_context(state: ResearchState, budget_tokens: int = 12000) -> str:
     feedback = state.get("final_report", "None")
     code_attempts = state.get("code_attempts", [])
 
-    core_header = f"Topic: {topic}\n\n" f"Hypothesis:\n{hypothesis}\n\n" f"Critic Feedback:\n{feedback}\n\n"
+    core_header = f"Topic: {topic}\n\nHypothesis:\n{hypothesis}\n\nCritic Feedback:\n{feedback}\n\n"
     core_tokens = _estimate_tokens(core_header)
 
     remaining_budget = budget_tokens - core_tokens
