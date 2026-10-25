@@ -39,8 +39,10 @@ def _named_values(
     singular = metrics.get(singular_key)
     if singular is not None:
         primary = values.get("primary")
-        if plural_key == "confidence_intervals" and isinstance(primary, (list, tuple)) and isinstance(
-            singular, (list, tuple)
+        if (
+            plural_key == "confidence_intervals"
+            and isinstance(primary, (list, tuple))
+            and isinstance(singular, (list, tuple))
         ):
             differs = tuple(primary) != tuple(singular)
         else:

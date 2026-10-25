@@ -41,6 +41,8 @@ jobs:
         run: pip install -e ".[dev]"
       - name: Validate Compose configuration
         run: docker compose config --quiet
+      - name: Build sandbox image
+        run: docker build -t discovery-sandbox:latest sandbox/
       - name: Start Milvus
         run: docker compose up -d --wait --wait-timeout 180 milvus
       - name: Integration tests
