@@ -7,6 +7,7 @@ from contextlib import suppress
 from pathlib import Path
 
 import docker
+from requests.exceptions import ConnectionError as DockerConnectionError
 from requests.exceptions import Timeout as DockerTimeout
 
 from discovery_agent.config import settings
@@ -79,11 +80,18 @@ def run_code(code: str, run_dir: Path, timeout_s: int | None = None) -> Executio
             mem_limit=settings.sandbox_mem_limit,
             nano_cpus=int(settings.sandbox_cpus * 1_000_000_000),
         )
+        wait_started_at = time.monotonic()
         try:
             result = container.wait(timeout=timeout)
             exit_code = int(result["StatusCode"])
         except DockerTimeout:
             timed_out = True
+        except DockerConnectionError:
+            if time.monotonic() - wait_started_at < timeout:
+                raise
+            timed_out = True
+
+        if timed_out:
             container.kill()
             result = container.wait(timeout=10)
             exit_code = int(result["StatusCode"])

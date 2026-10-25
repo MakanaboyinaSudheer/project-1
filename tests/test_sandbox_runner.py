@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from requests.exceptions import ConnectionError as DockerConnectionError
 from requests.exceptions import Timeout as DockerTimeout
 
 from discovery_agent.sandbox import runner
@@ -102,6 +103,38 @@ def test_run_code_kills_and_reports_timeout(tmp_path, monkeypatch) -> None:
     assert result.exit_code == 137
     assert result.timed_out is True
     assert container.killed is True
+    assert container.removed is True
+
+
+def test_run_code_kills_container_when_docker_wait_read_times_out(tmp_path, monkeypatch) -> None:
+    output_dir = tmp_path / "attempt" / "output"
+    container = FakeContainer(
+        [DockerConnectionError("Read timed out"), {"StatusCode": 137}],
+        output_dir,
+    )
+    install_fake_docker(monkeypatch, container)
+    clock = iter([0.0, 0.0, 1.0, 1.1])
+    monkeypatch.setattr(runner.time, "monotonic", lambda: next(clock))
+
+    result = runner.run_code("while True: pass", tmp_path / "attempt", timeout_s=1)
+
+    assert result.timed_out is True
+    assert result.exit_code == 137
+    assert container.killed is True
+    assert container.removed is True
+
+
+def test_run_code_propagates_early_docker_connection_errors(tmp_path, monkeypatch) -> None:
+    output_dir = tmp_path / "attempt" / "output"
+    container = FakeContainer([DockerConnectionError("connection refused")], output_dir)
+    install_fake_docker(monkeypatch, container)
+    clock = iter([0.0, 0.0, 0.1])
+    monkeypatch.setattr(runner.time, "monotonic", lambda: next(clock))
+
+    with pytest.raises(DockerConnectionError, match="connection refused"):
+        runner.run_code("pass", tmp_path / "attempt", timeout_s=5)
+
+    assert container.killed is False
     assert container.removed is True
 
 
