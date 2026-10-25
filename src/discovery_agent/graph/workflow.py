@@ -13,9 +13,9 @@
 Owner: Member 2. Node implementations live in discovery_agent.agents.*.
 """
 
+import os
 import sqlite3
 import uuid
-from pathlib import Path
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
@@ -28,10 +28,7 @@ from discovery_agent.agents.literature_reviewer import literature_reviewer_node
 from discovery_agent.agents.synthesizer import synthesizer_node
 from discovery_agent.graph.state import ResearchState
 
-# Dynamically resolve project root to avoid Streamlit relative path issues
-# workflow.py -> graph -> discovery_agent -> src -> project_root
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-DEFAULT_DB_PATH = str(PROJECT_ROOT / "volumes" / "checkpoints.sqlite")
+DEFAULT_DB_PATH = os.path.abspath(os.path.join(os.getcwd(), "checkpoints.sqlite"))
 
 
 def route_after_execution(state: ResearchState) -> str:
@@ -83,10 +80,7 @@ def build_graph(db_path: str = DEFAULT_DB_PATH):
     workflow.add_edge("synthesizer", END)
 
     if db_path != ":memory:":
-        # Ensure the target directory always exists
-        db_path_obj = Path(db_path)
-        db_path_obj.parent.mkdir(parents=True, exist_ok=True)
-        db_path = str(db_path_obj)
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
     conn = sqlite3.connect(db_path, check_same_thread=False)
     memory = SqliteSaver(conn)
