@@ -13,9 +13,9 @@
 Owner: Member 2. Node implementations live in discovery_agent.agents.*.
 """
 
-import os
 import sqlite3
 import uuid
+from pathlib import Path
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
@@ -27,6 +27,11 @@ from discovery_agent.agents.hypothesis_generator import hypothesis_generator_nod
 from discovery_agent.agents.literature_reviewer import literature_reviewer_node
 from discovery_agent.agents.synthesizer import synthesizer_node
 from discovery_agent.graph.state import ResearchState
+
+# Dynamically resolve project root to avoid Streamlit relative path issues
+# workflow.py -> graph -> discovery_agent -> src -> project_root
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+DEFAULT_DB_PATH = str(PROJECT_ROOT / "volumes" / "checkpoints.sqlite")
 
 
 def route_after_execution(state: ResearchState) -> str:
@@ -47,11 +52,7 @@ def route_after_execution(state: ResearchState) -> str:
 
 
 def route_after_critic(state: ResearchState) -> str:
-    """Route based on critic evaluation.
-
-    Returns 'synthesizer' if the results are significant/valid.
-    Returns 'hypothesis_generator' to refine the hypothesis otherwise.
-    """
+    """Route based on critic evaluation."""
     if state.get("is_significant") or state.get("passed_checks"):
         return "synthesizer"
     if len(state.get("code_attempts", [])) >= 5:
@@ -60,8 +61,8 @@ def route_after_critic(state: ResearchState) -> str:
     return "hypothesis_generator"
 
 
-def build_graph(db_path: str = "volumes/checkpoints.sqlite"):
-    """Return the compiled StateGraph with a SQLite checkpointer (resumable runs)."""
+def build_graph(db_path: str = DEFAULT_DB_PATH):
+    """Return the compiled StateGraph with a SQLite checkpointer."""
     workflow = StateGraph(ResearchState)
 
     workflow.add_node("literature_reviewer", literature_reviewer_node)
@@ -82,10 +83,14 @@ def build_graph(db_path: str = "volumes/checkpoints.sqlite"):
     workflow.add_edge("synthesizer", END)
 
     if db_path != ":memory:":
-        os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
+        # Ensure the target directory always exists
+        db_path_obj = Path(db_path)
+        db_path_obj.parent.mkdir(parents=True, exist_ok=True)
+        db_path = str(db_path_obj)
 
     conn = sqlite3.connect(db_path, check_same_thread=False)
     memory = SqliteSaver(conn)
+    memory.setup()
 
     return workflow.compile(checkpointer=memory)
 
@@ -93,7 +98,7 @@ def build_graph(db_path: str = "volumes/checkpoints.sqlite"):
 def run_discovery(
     topic: str,
     thread_id: str | None = None,
-    db_path: str = "volumes/checkpoints.sqlite",
+    db_path: str = DEFAULT_DB_PATH,
 ) -> dict:
     """Execute the discovery workflow for a given topic."""
     if not thread_id:
@@ -109,7 +114,7 @@ def run_discovery(
 
 def get_run_status(
     thread_id: str,
-    db_path: str = "volumes/checkpoints.sqlite",
+    db_path: str = DEFAULT_DB_PATH,
 ) -> dict | None:
     """Retrieve the latest state of a specific run for recovery monitoring."""
     graph = build_graph(db_path=db_path)
@@ -123,9 +128,9 @@ def get_run_status(
 
 def resume_discovery(
     thread_id: str,
-    db_path: str = "volumes/checkpoints.sqlite",
+    db_path: str = DEFAULT_DB_PATH,
 ) -> dict:
-    """Resume a suspended or crashed discovery workflow from its last checkpoint."""
+    """Resume a suspended or crashed discovery workflow."""
     graph = build_graph(db_path=db_path)
     config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
 
