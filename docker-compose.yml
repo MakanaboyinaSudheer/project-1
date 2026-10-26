@@ -1,6 +1,4 @@
-# Shared local infrastructure. Every teammate runs: docker compose up -d
-# Milvus standalone in embedded mode (built-in etcd + local disk storage, no MinIO needed)
-# and the Attu web UI at http://localhost:8000
+version: '3.8'
 services:
   milvus:
     image: milvusdb/milvus:v2.5.4
@@ -33,3 +31,28 @@ services:
       - "8000:3000"
     depends_on:
       - milvus
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: discovery_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  discovery_agent:
+    build: .
+    container_name: discovery_app
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./src:/app/src
+      - ./volumes:/app/volumes
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      - ollama
+
+volumes:
+  ollama_data:
