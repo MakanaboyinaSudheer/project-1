@@ -1,5 +1,10 @@
 """Streamlit frontend for the Discovery Agent."""
 
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import uuid
 
 import streamlit as st
@@ -26,9 +31,7 @@ with st.sidebar:
         if topic_input.strip():
             st.session_state.is_running = True
             st.session_state.topic = topic_input
-            # Generate a new thread ID for a fresh run
             st.session_state.thread_id = str(uuid.uuid4())
-            # Clear previous results
             st.session_state.pop("final_state", None)
         else:
             st.error("Please enter a topic.")
