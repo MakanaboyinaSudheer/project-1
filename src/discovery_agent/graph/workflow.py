@@ -44,8 +44,24 @@ def review_node(state: AgentState):
 
 
 def hypothesis_node(state: AgentState):
-    last_message = state["messages"][-1].content if state.get("messages") else "No summary generated."
-    return {"memory_summary": f"Review Summary: {last_message}"}
+    messages = state.get("messages", [])
+    topic = state.get("research_topic", "")
+    review_summary = messages[-1].content if messages else "No prior context."
+    sys_msg = SystemMessage(
+        content=(
+            "You are a lead AI research scientist specializing in causal inference. "
+            "Based on the provided literature review, formulate a novel, testable hypothesis. "
+            "Clearly define the recommended treatment, outcome, and potential confounders to test."
+        )
+    )
+    human_msg = HumanMessage(
+        content=f"Topic: {topic}\n\nLiterature Review:\n{review_summary}\n\nGenerate the hypothesis."
+    )
+    response = llm.invoke([sys_msg, human_msg])
+    combined_memory = (
+        f"**1. Literature Review:**\n{review_summary}\n\n" f"**2. Proposed Hypothesis:**\n{response.content}"
+    )
+    return {"messages": [response], "memory_summary": combined_memory}
 
 
 def code_node(state: AgentState):
