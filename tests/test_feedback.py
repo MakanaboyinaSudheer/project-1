@@ -29,9 +29,20 @@ def test_compute_reward_uses_metrics_and_iteration_penalty() -> None:
         stdout="",
         stderr="",
         duration_s=0.1,
-        metrics={"test": "t_test", "p_value": 0.03},
+        metrics={
+            "test": "t_test",
+            "p_value": 0.03,
+            "effect_size": 0.4,
+            "sample_size": 42,
+        },
     )
-    missing_metrics = ExecutionResult(exit_code=0, stdout="", stderr="", duration_s=0.1)
+    missing_metrics = ExecutionResult(
+        exit_code=0,
+        stdout="",
+        stderr="",
+        duration_s=0.1,
+        metrics={"test": "t_test", "p_value": "invalid"},
+    )
     syntax_error = ExecutionResult(
         exit_code=1,
         stdout="",

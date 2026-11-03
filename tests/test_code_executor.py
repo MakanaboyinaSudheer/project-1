@@ -53,7 +53,12 @@ def test_executor_generates_code_runs_it_and_records_attempt(monkeypatch, tmp_pa
         stdout="finished",
         stderr="",
         duration_s=0.5,
-        metrics={"test": "welch_t_test", "p_value": 0.01},
+        metrics={
+            "test": "welch_t_test",
+            "p_value": 0.01,
+            "effect_size": 0.4,
+            "sample_size": 50,
+        },
     )
     calls = []
     monkeypatch.setattr(code_executor, "run_code", lambda code, path: calls.append((code, path)) or execution)
@@ -93,7 +98,12 @@ def test_executor_runs_debugger_code_without_calling_llm(monkeypatch, tmp_path: 
             stdout="",
             stderr="",
             duration_s=0.1,
-            metrics={"test": "t_test"},
+            metrics={
+                "test": "t_test",
+                "p_value": 0.04,
+                "effect_size": 0.2,
+                "sample_size": 40,
+            },
         )
 
     monkeypatch.setattr(code_executor, "run_code", fake_run_code)
@@ -110,6 +120,41 @@ def test_executor_runs_debugger_code_without_calling_llm(monkeypatch, tmp_path: 
     assert result["code"] == "print('repaired')"
     assert result["attempts"][0].iteration == 2
     assert calls == [("print('repaired')", tmp_path / "run-2" / "attempt_2")]
+
+
+def test_executor_updates_bandit_for_repaired_attempt(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(code_executor.settings, "runs_dir", str(tmp_path))
+    monkeypatch.setattr(
+        code_executor,
+        "run_code",
+        lambda *_: ExecutionResult(
+            exit_code=0,
+            stdout="",
+            stderr="",
+            duration_s=0.1,
+            metrics={
+                "test": "t_test",
+                "p_value": 0.04,
+                "effect_size": 0.2,
+                "sample_size": 40,
+            },
+        ),
+    )
+    updates = []
+    monkeypatch.setattr(code_executor, "update_strategy", lambda *args: updates.append(args))
+
+    result = code_executor.code_executor_node(
+        {
+            "hypothesis": _hypothesis(),
+            "thread_id": "run-3",
+            "code": "print('repaired')",
+            "debug_strategy": "simplify",
+        }
+    )
+
+    assert result["attempts"][0].strategy == "simplify"
+    assert updates[0][0] == tmp_path / "bandit.json"
+    assert updates[0][1:] == ("simplify", 0.5)
 
 
 @pytest.mark.parametrize(

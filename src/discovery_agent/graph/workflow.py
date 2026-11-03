@@ -13,6 +13,7 @@
 Owner: Member 2. Node implementations live in discovery_agent.agents.*.
 """
 
+from discovery_agent.config import settings
 from discovery_agent.graph.state import ResearchState
 
 MAX_REFINEMENTS = 3
@@ -25,7 +26,13 @@ def build_graph():
 
 def route_after_execution(state: ResearchState) -> str:
     """'debug' if the last attempt failed and budget remains, 'critic' if it succeeded, else 'fail'."""
-    raise NotImplementedError("Week 2 - Member 3")
+    attempts = state.get("attempts", [])
+    if not attempts:
+        return "failed"
+    result = attempts[-1].result
+    if result.exit_code == 0 and not result.timed_out:
+        return "critic"
+    return "debug" if state.get("debug_iteration", 0) < settings.max_debug_iterations else "failed"
 
 
 def route_after_critic(state: ResearchState) -> str:

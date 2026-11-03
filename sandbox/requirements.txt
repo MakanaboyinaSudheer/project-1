@@ -7,3 +7,6 @@ scikit-learn
 statsmodels
 matplotlib
 seaborn
+# Pin the CPU build so the sandbox image never pulls CUDA runtime libraries.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.7.1+cpu
