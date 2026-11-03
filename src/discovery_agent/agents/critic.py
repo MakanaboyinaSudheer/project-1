@@ -10,6 +10,7 @@ from scipy import stats
 from discovery_agent.graph.state import ResearchState, trace_event
 from discovery_agent.llm import get_llm
 from discovery_agent.schemas import CriticReport, ExecutionResult
+from discovery_agent.telemetry.costs import CostTracker
 
 
 class MethodologyReview(BaseModel):
@@ -321,6 +322,8 @@ def critic_node(state: ResearchState) -> dict[str, object]:
         report = statistical_checks(latest_result)
         hypothesis = state.get("hypothesis")
         if hypothesis is not None:
+            run_id = state.get("thread_id", "local-run")
+            tracker = CostTracker(run_id=run_id)
             review = (
                 get_llm()
                 .with_structured_output(MethodologyReview)
@@ -338,7 +341,8 @@ def critic_node(state: ResearchState) -> dict[str, object]:
                             f"Execution metrics: {latest_result.metrics!r}\n"
                             f"Deterministic critic: {report.model_dump_json()}",
                         ),
-                    ]
+                    ],
+                    config={"callbacks": [tracker], "metadata": {"node": "critic"}},
                 )
             )
             review = MethodologyReview.model_validate(review)

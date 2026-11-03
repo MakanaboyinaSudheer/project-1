@@ -9,7 +9,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from dashboard.app import _serialize_run, _trace_dataframe, discover_runs  # noqa: E402
+from dashboard.app import (  # noqa: E402
+    _attempt_diffs,
+    _attempt_rewards,
+    _citation_dataframe,
+    _serialize_run,
+    _trace_dataframe,
+    discover_runs,
+)
 
 
 def test_serialize_run_exports_run_data_as_json() -> None:
@@ -118,3 +125,41 @@ def test_trace_dataframe_preserves_step_order_and_handles_incomplete_events() ->
         {"Step": 2, "Node": "hypothesis_generator", "Summary": "Generated hypothesis", "Time": ""},
         {"Step": 3, "Node": "unknown", "Summary": "unexpected trace entry", "Time": ""},
     ]
+
+
+def test_citation_dataframe_shows_hypothesis_quotes_and_source_links() -> None:
+    citations = _citation_dataframe(
+        {"citations": [{"paper_id": "pubmed:1", "title": "Cited study", "quote": "Supporting evidence."}]},
+        [
+            {
+                "paper_id": "pubmed:1",
+                "metadata": {"title": "Source title", "url": "https://example.test/paper"},
+            }
+        ],
+    )
+
+    assert citations.to_dict("records") == [
+        {
+            "Title": "Cited study",
+            "Paper ID": "pubmed:1",
+            "Quote": "Supporting evidence.",
+            "URL": "https://example.test/paper",
+        }
+    ]
+
+
+def test_attempt_helpers_build_reward_curve_and_code_diffs() -> None:
+    attempts = [
+        {"iteration": 1, "reward": -0.5, "code": "print('bad')\n"},
+        {"iteration": 2, "reward": 0.5, "code": "print('fixed')\n"},
+    ]
+
+    assert _attempt_rewards(attempts).to_dict("records") == [
+        {"Iteration": 1, "Reward": -0.5},
+        {"Iteration": 2, "Reward": 0.5},
+    ]
+    diffs = _attempt_diffs(attempts)
+    assert diffs[0]["from"] == 1
+    assert diffs[0]["to"] == 2
+    assert "-print('bad')" in diffs[0]["diff"]
+    assert "+print('fixed')" in diffs[0]["diff"]

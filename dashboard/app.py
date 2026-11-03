@@ -6,6 +6,7 @@ launched during early project stages and still provide a useful empty-state view
 
 from __future__ import annotations
 
+import difflib
 import json
 from pathlib import Path
 from typing import Any
@@ -113,6 +114,7 @@ def discover_runs(base_dir: str | Path = DEFAULT_RUNS_DIR) -> list[dict[str, Any
                 "trace": trace if isinstance(trace, list) else [],
                 "attempts": attempts if isinstance(attempts, list) else [],
                 "critic_report": critic_report if isinstance(critic_report, dict) else {},
+                "hypothesis": state.get("hypothesis", {}) if isinstance(state, dict) else {},
                 "literature": literature if isinstance(literature, list) else [],
                 "costs": cost_rows,
                 "cost_total_usd": cost_total,
@@ -148,6 +150,71 @@ def _trace_dataframe(trace: list[Any]) -> pd.DataFrame:
 
 def _serialize_run(run: dict[str, Any]) -> str:
     return json.dumps(run, indent=2, default=str)
+
+
+def _citation_dataframe(hypothesis: Any, literature: list[Any]) -> pd.DataFrame:
+    citations = hypothesis.get("citations", []) if isinstance(hypothesis, dict) else []
+    sources: dict[str, dict[str, Any]] = {}
+    for item in literature:
+        if isinstance(item, dict) and isinstance(item.get("paper_id"), str):
+            sources.setdefault(item["paper_id"], item)
+
+    rows = []
+    for citation in citations:
+        if not isinstance(citation, dict):
+            continue
+        paper_id = citation.get("paper_id", "")
+        source = sources.get(paper_id, {})
+        metadata = source.get("metadata", {}) if isinstance(source, dict) else {}
+        metadata = metadata if isinstance(metadata, dict) else {}
+        rows.append(
+            {
+                "Title": citation.get("title") or metadata.get("title") or paper_id,
+                "Paper ID": paper_id,
+                "Quote": citation.get("quote", ""),
+                "URL": metadata.get("url", ""),
+            }
+        )
+    return pd.DataFrame(rows, columns=["Title", "Paper ID", "Quote", "URL"])
+
+
+def _attempt_rewards(attempts: list[Any]) -> pd.DataFrame:
+    rows = []
+    for index, attempt in enumerate(attempts, start=1):
+        if not isinstance(attempt, dict):
+            continue
+        iteration = attempt.get("iteration", index)
+        reward = attempt.get("reward")
+        if isinstance(reward, (int, float)) and not isinstance(reward, bool):
+            rows.append({"Iteration": iteration, "Reward": reward})
+    return pd.DataFrame(rows, columns=["Iteration", "Reward"])
+
+
+def _attempt_diffs(attempts: list[Any]) -> list[dict[str, Any]]:
+    diffs = []
+    previous_code: str | None = None
+    previous_iteration: Any = None
+    for index, attempt in enumerate(attempts, start=1):
+        if not isinstance(attempt, dict):
+            continue
+        code = attempt.get("code")
+        if not isinstance(code, str):
+            continue
+        iteration = attempt.get("iteration", index)
+        if previous_code is not None:
+            diff = "\n".join(
+                difflib.unified_diff(
+                    previous_code.splitlines(),
+                    code.splitlines(),
+                    fromfile=f"attempt-{previous_iteration}",
+                    tofile=f"attempt-{iteration}",
+                    lineterm="",
+                )
+            )
+            diffs.append({"from": previous_iteration, "to": iteration, "diff": diff})
+        previous_code = code
+        previous_iteration = iteration
+    return diffs
 
 
 def _render_runs(runs: list[dict[str, Any]]) -> None:
@@ -221,11 +288,19 @@ def _render_runs(runs: list[dict[str, Any]]) -> None:
                 st.json(trace)
 
     with tabs[1]:
-        literature = selected_run.get("literature", [])
-        if not literature:
-            st.info("No literature citations were recorded for this run yet.")
+        citation_frame = _citation_dataframe(
+            selected_run.get("hypothesis", {}),
+            selected_run.get("literature", []),
+        )
+        if citation_frame.empty:
+            st.info("No hypothesis citations were recorded for this run yet.")
         else:
-            st.dataframe(pd.json_normalize(literature), use_container_width=True)
+            st.dataframe(
+                citation_frame,
+                use_container_width=True,
+                hide_index=True,
+                column_config={"URL": st.column_config.LinkColumn("Paper")},
+            )
 
     with tabs[2]:
         attempts = selected_run.get("attempts", [])
@@ -233,6 +308,13 @@ def _render_runs(runs: list[dict[str, Any]]) -> None:
             st.info("No code attempts are available for this run yet.")
         else:
             st.dataframe(pd.json_normalize(attempts), use_container_width=True)
+            rewards = _attempt_rewards(attempts)
+            if not rewards.empty:
+                st.subheader("Repair reward curve")
+                st.line_chart(rewards.set_index("Iteration"))
+            for attempt_diff in _attempt_diffs(attempts):
+                with st.expander(f"Code changes: attempt {attempt_diff['from']} → {attempt_diff['to']}"):
+                    st.code(attempt_diff["diff"] or "No code changes.", language="diff")
 
     with tabs[3]:
         critic_report = selected_run.get("critic_report", {})
@@ -247,6 +329,10 @@ def _render_runs(runs: list[dict[str, Any]]) -> None:
             st.info("No cost records are available for this run yet.")
         else:
             st.dataframe(pd.json_normalize(cost_rows), use_container_width=True)
+            cost_frame = pd.DataFrame(cost_rows)
+            if {"model", "usd"}.issubset(cost_frame.columns):
+                st.subheader("Cost by model")
+                st.bar_chart(cost_frame.groupby("model", as_index=True)["usd"].sum())
 
 
 def main() -> None:

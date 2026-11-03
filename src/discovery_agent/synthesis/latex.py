@@ -2,6 +2,8 @@
 
 import hashlib
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
@@ -27,6 +29,63 @@ _LATEX_ESCAPES = {
     "~": r"\textasciitilde{}",
     "^": r"\textasciicircum{}",
 }
+
+
+def compile_paper(paper_path: str | Path, timeout_s: int = 120) -> dict[str, str]:
+    """Compile a rendered paper when Tectonic or pdfLaTeX is installed."""
+    path = Path(paper_path).resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"LaTeX paper not found: {path}")
+    if timeout_s <= 0:
+        raise ValueError("timeout_s must be greater than zero")
+
+    tectonic = shutil.which("tectonic")
+    pdflatex = shutil.which("pdflatex")
+    if tectonic:
+        commands = [[tectonic, "--keep-logs", "--outdir", str(path.parent), path.name]]
+        compiler = "tectonic"
+    elif pdflatex:
+        commands = [
+            [pdflatex, "-interaction=nonstopmode", "-halt-on-error", path.name],
+            [shutil.which("bibtex") or "bibtex", path.stem],
+            [pdflatex, "-interaction=nonstopmode", "-halt-on-error", path.name],
+            [pdflatex, "-interaction=nonstopmode", "-halt-on-error", path.name],
+        ]
+        compiler = "pdflatex"
+    else:
+        return {
+            "status": "unavailable",
+            "compiler": "",
+            "message": "Install Tectonic or pdfLaTeX to produce paper.pdf.",
+        }
+
+    for command in commands:
+        try:
+            result = subprocess.run(
+                command,
+                cwd=path.parent,
+                capture_output=True,
+                text=True,
+                timeout=timeout_s,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(f"LaTeX compilation timed out after {timeout_s}s: {command[0]}") from exc
+        if result.returncode:
+            details = (result.stdout + "\n" + result.stderr).strip()
+            raise RuntimeError(
+                f"LaTeX compilation failed with {command[0]} (exit {result.returncode}):\n{details}"
+            )
+
+    pdf_path = path.with_suffix(".pdf")
+    if not pdf_path.is_file():
+        raise RuntimeError(f"LaTeX compiler succeeded but did not produce {pdf_path}")
+    return {
+        "status": "compiled",
+        "compiler": compiler,
+        "message": "LaTeX paper compiled successfully.",
+        "pdf_path": str(pdf_path),
+    }
 
 
 def _escape_latex(value: str) -> str:

@@ -132,8 +132,10 @@ def test_critic_node_runs_methodology_review_without_changing_statistics(monkeyp
             assert schema.__name__ == "MethodologyReview"
             return self
 
-        def invoke(self, messages):
+        def invoke(self, messages, config=None):
             assert "Do not recalculate or change" in messages[0][1]
+            assert config["metadata"]["node"] == "critic"
+            assert len(config["callbacks"]) == 1
             return {"issues": ["Potential selection bias."], "summary": "Review flagged selection bias."}
 
     monkeypatch.setattr(critic, "get_llm", lambda: FakeModel())
@@ -145,6 +147,7 @@ def test_critic_node_runs_methodology_review_without_changing_statistics(monkeyp
             test_plan="Compare treatment and control groups",
             expected_outcome="Higher outcome for treatment",
         ),
+        thread_id="critic-test",
         attempts=[
             CodeAttempt(
                 iteration=1,
