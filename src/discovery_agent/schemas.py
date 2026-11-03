@@ -4,8 +4,10 @@ Changing a model here affects every teammate: do it in its own PR, tag all four
 members for review, and update MODULES.md in the same PR.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
-from typing import Literal
+from typing import Literal, TypedDict
 
 from pydantic import BaseModel, Field
 
@@ -84,3 +86,14 @@ class CostEvent(BaseModel):
     output_tokens: int = 0
     usd: float = 0.0
     at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AgentState(TypedDict):
+    """LangGraph state object passed between orchestration agents."""
+
+    research_topic: str
+    literature_context: list[RetrievedChunk]
+    hypothesis: Hypothesis | None
+    code_attempts: list[CodeAttempt]
+    final_report: CriticReport | None
+    errors: list[str]
