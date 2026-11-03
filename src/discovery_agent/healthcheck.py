@@ -1,10 +1,14 @@
 """`discovery-agent check` — confirms a teammate's environment matches the team setup."""
 
+import tempfile
+from pathlib import Path
+
 import docker
 from pymilvus import MilvusClient
 
 from discovery_agent.config import settings
 from discovery_agent.llm import get_llm
+from discovery_agent.sandbox.runner import run_code
 
 
 def _check(name: str, fn) -> bool:
@@ -24,8 +28,26 @@ def _milvus() -> str:
 
 def _docker() -> str:
     client = docker.from_env()
-    client.images.get(settings.sandbox_image)
+    try:
+        client.images.get(settings.sandbox_image)
+    finally:
+        client.close()
     return f"image {settings.sandbox_image} present"
+
+
+def _sandbox_execution() -> str:
+    with tempfile.TemporaryDirectory(prefix="discovery-agent-check-") as temp_dir:
+        result = run_code(
+            "print('sandbox-ready')",
+            Path(temp_dir) / "attempt",
+            timeout_s=min(settings.sandbox_timeout_s, 15),
+        )
+    if result.exit_code != 0 or result.timed_out or "sandbox-ready" not in result.stdout:
+        raise RuntimeError(
+            f"Sandbox smoke execution failed (exit={result.exit_code}, "
+            f"timed_out={result.timed_out}): {result.stderr}"
+        )
+    return f"execution completed in {result.duration_s:.2f}s"
 
 
 def _llm() -> str:
@@ -37,6 +59,7 @@ def run_checks() -> None:
     results = [
         _check("Milvus", _milvus),
         _check("Docker sandbox image", _docker),
+        _check("Docker sandbox execution", _sandbox_execution),
         _check("LLM", _llm),
     ]
     raise SystemExit(0 if all(results) else 1)

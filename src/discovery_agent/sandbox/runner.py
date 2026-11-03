@@ -7,7 +7,9 @@ from contextlib import suppress
 from pathlib import Path
 
 import docker
+from docker.errors import DockerException
 from requests.exceptions import ConnectionError as DockerConnectionError
+from requests.exceptions import RequestException
 from requests.exceptions import Timeout as DockerTimeout
 
 from discovery_agent.config import settings
@@ -41,6 +43,35 @@ def _collect_artifacts(output_dir: Path) -> tuple[dict[str, str], dict]:
             metrics = parsed_metrics
 
     return artifacts, metrics
+
+
+def _collect_resource_usage(container) -> tuple[dict[str, int | float], str | None]:
+    try:
+        stats = container.stats(stream=False)
+    except (DockerException, RequestException) as exc:
+        return {}, f"{type(exc).__name__}: {exc}"
+
+    memory = stats.get("memory_stats", {})
+    cpu = stats.get("cpu_stats", {})
+    pre_cpu = stats.get("precpu_stats", {})
+    cpu_usage = cpu.get("cpu_usage", {})
+    pre_cpu_usage = pre_cpu.get("cpu_usage", {})
+    usage: dict[str, int | float] = {}
+    for key, value in (
+        ("memory_usage_bytes", memory.get("usage")),
+        ("memory_limit_bytes", memory.get("limit")),
+        ("memory_peak_bytes", memory.get("max_usage")),
+        ("cpu_total_usage_ns", cpu_usage.get("total_usage")),
+    ):
+        if isinstance(value, (int, float)) and value >= 0:
+            usage[key] = value
+
+    cpu_delta = cpu_usage.get("total_usage", 0) - pre_cpu_usage.get("total_usage", 0)
+    system_delta = cpu.get("system_cpu_usage", 0) - pre_cpu.get("system_cpu_usage", 0)
+    online_cpus = cpu.get("online_cpus") or len(cpu_usage.get("percpu_usage", []))
+    if cpu_delta >= 0 and system_delta > 0 and online_cpus > 0:
+        usage["cpu_percent"] = round(cpu_delta / system_delta * online_cpus * 100, 2)
+    return usage, None
 
 
 def run_code(code: str, run_dir: Path, timeout_s: int | None = None) -> ExecutionResult:
@@ -99,6 +130,7 @@ def run_code(code: str, run_dir: Path, timeout_s: int | None = None) -> Executio
         stdout = _decode_logs(container, stdout=True)
         stderr = _decode_logs(container, stdout=False)
         artifacts, metrics = _collect_artifacts(output_dir)
+        resource_usage, resource_usage_error = _collect_resource_usage(container)
         return ExecutionResult(
             exit_code=exit_code,
             stdout=stdout,
@@ -107,6 +139,8 @@ def run_code(code: str, run_dir: Path, timeout_s: int | None = None) -> Executio
             timed_out=timed_out,
             artifacts=artifacts,
             metrics=metrics,
+            resource_usage=resource_usage,
+            resource_usage_error=resource_usage_error,
         )
     finally:
         if container is not None:

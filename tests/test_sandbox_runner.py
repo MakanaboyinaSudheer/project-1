@@ -14,6 +14,18 @@ class FakeContainer:
         self.wait_calls = 0
         self.killed = False
         self.removed = False
+        self.stats_result = {
+            "memory_stats": {"usage": 1024, "limit": 2048, "max_usage": 1536},
+            "cpu_stats": {
+                "cpu_usage": {"total_usage": 250, "percpu_usage": [125, 125]},
+                "system_cpu_usage": 1000,
+                "online_cpus": 2,
+            },
+            "precpu_stats": {
+                "cpu_usage": {"total_usage": 50},
+                "system_cpu_usage": 500,
+            },
+        }
 
     def wait(self, **kwargs):
         result = self.wait_results[self.wait_calls]
@@ -24,6 +36,10 @@ class FakeContainer:
 
     def logs(self, *, stdout: bool, stderr: bool) -> bytes:
         return b"standard output\n" if stdout else b"standard error\n"
+
+    def stats(self, *, stream: bool) -> dict:
+        assert stream is False
+        return self.stats_result
 
     def kill(self) -> None:
         self.killed = True
@@ -73,6 +89,14 @@ def test_run_code_collects_logs_metrics_and_artifacts(tmp_path, monkeypatch) -> 
     assert result.stderr == "standard error\n"
     assert result.timed_out is False
     assert result.metrics == {"p_value": 0.01}
+    assert result.resource_usage == {
+        "memory_usage_bytes": 1024,
+        "memory_limit_bytes": 2048,
+        "memory_peak_bytes": 1536,
+        "cpu_total_usage_ns": 250,
+        "cpu_percent": 80.0,
+    }
+    assert result.resource_usage_error is None
     assert set(result.artifacts) == {"metrics.json", "plot.png"}
     assert container.removed is True
     assert client.closed is True
@@ -143,3 +167,56 @@ def test_run_code_rejects_non_positive_timeout(tmp_path, monkeypatch) -> None:
 
     with pytest.raises(ValueError, match="greater than zero"):
         runner.run_code("pass", tmp_path / "attempt", timeout_s=0)
+
+
+def test_resource_stats_failure_is_reported_without_discarding_execution(tmp_path, monkeypatch) -> None:
+    container = FakeContainer([{"StatusCode": 0}], tmp_path / "attempt" / "output")
+    client = install_fake_docker(monkeypatch, container)
+    container.stats = lambda **_: (_ for _ in ()).throw(runner.docker.errors.APIError("stats unavailable"))
+
+    result = runner.run_code("print('done')", tmp_path / "attempt", timeout_s=5)
+
+    assert result.exit_code == 0
+    assert result.resource_usage == {}
+    assert result.resource_usage_error == "APIError: stats unavailable"
+    assert client.closed is True
+
+
+@pytest.mark.integration
+def test_sandbox_survives_fifty_consecutive_runs(tmp_path: Path) -> None:
+    for attempt in range(50):
+        result = runner.run_code(
+            "from pathlib import Path\n"
+            "Path('/output/metrics.json').write_text('{\"ok\": true}', encoding='utf-8')",
+            tmp_path / f"attempt_{attempt + 1}",
+            timeout_s=10,
+        )
+        assert result.exit_code == 0, f"attempt {attempt + 1}: {result.stderr}"
+        assert result.metrics == {"ok": True}
+
+
+@pytest.mark.integration
+def test_sandbox_includes_cpu_only_torch(tmp_path: Path) -> None:
+    code = """
+import json
+import torch
+
+tensor = torch.tensor([1.0, 2.0])
+with open("/output/metrics.json", "w", encoding="utf-8") as stream:
+    json.dump(
+        {
+            "torch_available": True,
+            "tensor_device": tensor.device.type,
+            "cuda_available": torch.cuda.is_available(),
+        },
+        stream,
+    )
+"""
+    result = runner.run_code(code, tmp_path / "attempt", timeout_s=30)
+
+    assert result.exit_code == 0, result.stderr
+    assert result.metrics == {
+        "torch_available": True,
+        "tensor_device": "cpu",
+        "cuda_available": False,
+    }

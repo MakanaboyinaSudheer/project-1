@@ -29,6 +29,7 @@ class ResearchState(TypedDict, total=False):
     code: str
     attempts: Annotated[list[CodeAttempt], operator.add]
     debug_iteration: int
+    debug_strategy: str
     refinement_iteration: int
 
     # Critic
