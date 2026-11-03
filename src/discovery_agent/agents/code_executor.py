@@ -8,6 +8,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from discovery_agent.config import settings
 from discovery_agent.graph.state import ResearchState, trace_event
 from discovery_agent.llm import get_llm
+from discovery_agent.sandbox.bandit import update_strategy
 from discovery_agent.sandbox.feedback import compute_reward
 from discovery_agent.sandbox.runner import run_code
 from discovery_agent.schemas import CodeAttempt
@@ -76,7 +77,16 @@ def code_executor_node(state: ResearchState) -> dict:
     attempt_dir = Path(settings.runs_dir) / run_id / f"attempt_{iteration}"
     result = run_code(code, attempt_dir)
     reward = compute_reward(result, iteration - 1)
-    attempt = CodeAttempt(iteration=iteration, code=code, result=result, reward=reward)
+    strategy = state.get("debug_strategy")
+    if strategy is not None:
+        update_strategy(Path(settings.runs_dir) / "bandit.json", strategy, reward)
+    attempt = CodeAttempt(
+        iteration=iteration,
+        code=code,
+        result=result,
+        reward=reward,
+        strategy=strategy,
+    )
     return {
         "code": code,
         "attempts": [attempt],

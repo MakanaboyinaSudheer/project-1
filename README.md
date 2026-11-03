@@ -8,6 +8,8 @@ the statistics, and writes LaTeX research drafts.
 - **[PLAN.md](PLAN.md):** 4-week day-by-day schedule
 - **[MODULES.md](MODULES.md):** module specs and ownership
 - **[CONTRIBUTING.md](CONTRIBUTING.md):** branching, commits, PRs
+- **[PLATFORM_RUNBOOK.md](PLATFORM_RUNBOOK.md):** platform setup and verification
+- **[SECURITY_AUDIT.md](SECURITY_AUDIT.md):** sandbox controls and residual risks
 
 ## Prerequisites
 - Python **3.12**

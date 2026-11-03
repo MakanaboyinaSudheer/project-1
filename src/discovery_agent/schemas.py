@@ -61,6 +61,8 @@ class ExecutionResult(BaseModel):
     timed_out: bool = False
     artifacts: dict[str, str] = Field(default_factory=dict)  # filename -> path on host
     metrics: dict = Field(default_factory=dict)  # parsed from /output/metrics.json
+    resource_usage: dict[str, int | float] = Field(default_factory=dict)
+    resource_usage_error: str | None = None
 
 
 class CodeAttempt(BaseModel):
@@ -68,6 +70,7 @@ class CodeAttempt(BaseModel):
     code: str
     result: ExecutionResult
     reward: float  # see sandbox/feedback.py for the reward definition
+    strategy: str | None = None
 
 
 class CriticReport(BaseModel):

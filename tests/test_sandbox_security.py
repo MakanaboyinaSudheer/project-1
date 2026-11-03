@@ -12,6 +12,7 @@ def test_runner_passes_required_isolation_and_resource_limits(monkeypatch, tmp_p
     container = MagicMock()
     container.wait.return_value = {"StatusCode": 0}
     container.logs.return_value = b""
+    container.stats.return_value = {}
     client = MagicMock()
     client.containers.run.return_value = container
     monkeypatch.setattr(runner.docker, "from_env", lambda: client)
@@ -109,3 +110,76 @@ def test_timed_out_container_is_killed(tmp_path: Path) -> None:
 
     assert result.timed_out is True
     assert result.exit_code != 0
+
+
+@pytest.mark.integration
+def test_container_cannot_read_unmounted_host_file(tmp_path: Path) -> None:
+    marker = tmp_path / "host-secret.txt"
+    marker.write_text("host-only-marker", encoding="utf-8")
+    code = f"""
+import json
+from pathlib import Path
+
+marker_exists = Path({str(marker)!r}).exists()
+Path("/output/metrics.json").write_text(json.dumps({{"host_marker_visible": marker_exists}}))
+"""
+
+    result = runner.run_code(code, tmp_path / "attempt", timeout_s=10)
+
+    assert result.exit_code == 0, result.stderr
+    assert result.metrics == {"host_marker_visible": False}
+
+
+@pytest.mark.integration
+def test_container_enforces_process_limit(tmp_path: Path) -> None:
+    code = """
+import json
+import os
+
+children = []
+limit_reached = False
+try:
+    for _ in range(256):
+        try:
+            pid = os.fork()
+        except OSError:
+            limit_reached = True
+            break
+        if pid == 0:
+            os._exit(0)
+        children.append(pid)
+finally:
+    for pid in children:
+        os.waitpid(pid, 0)
+
+with open("/output/metrics.json", "w", encoding="utf-8") as stream:
+    json.dump({"pids_limit_enforced": limit_reached}, stream)
+"""
+    result = runner.run_code(code, tmp_path / "attempt", timeout_s=20)
+
+    assert result.exit_code == 0, result.stderr
+    assert result.metrics == {"pids_limit_enforced": True}
+
+
+@pytest.mark.integration
+def test_experiment_memory_exhaustion_is_contained(tmp_path: Path) -> None:
+    code = """
+import json
+import resource
+
+limit = 256 * 1024 * 1024
+resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
+try:
+    bytearray(512 * 1024 * 1024)
+except MemoryError:
+    exhausted_safely = True
+else:
+    exhausted_safely = False
+
+with open("/output/metrics.json", "w", encoding="utf-8") as stream:
+    json.dump({"memory_limit_enforced": exhausted_safely}, stream)
+"""
+    result = runner.run_code(code, tmp_path / "attempt", timeout_s=10)
+
+    assert result.exit_code == 0, result.stderr
+    assert result.metrics == {"memory_limit_enforced": True}
