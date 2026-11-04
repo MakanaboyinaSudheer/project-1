@@ -139,6 +139,26 @@ def execution_node(state: AgentState):
     return {"messages": [execution_msg]}
 
 
+def report_node(state: AgentState):
+    messages = state.get("messages", [])
+    execution_result = messages[-1].content if messages else "No execution data."
+    context = state.get("memory_summary", "")
+
+    sys_msg = SystemMessage(
+        content=(
+            "You are a Senior AI Researcher. Write a concise final markdown report "
+            "summarizing the initial hypothesis, the experimental approach, and the "
+            "final execution results."
+        )
+    )
+    human_msg = HumanMessage(
+        content=f"Context:\n{context}\n\nExecution Results:\n{execution_result}\n\nWrite the report."
+    )
+
+    response = llm.invoke([sys_msg, human_msg])
+    return {"messages": [response]}
+
+
 def route_review(state: AgentState):
     last_message = state["messages"][-1]
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
@@ -162,6 +182,7 @@ workflow.add_node("hypothesis", hypothesis_node)
 workflow.add_node("code", code_node)
 workflow.add_node("critic", critic_node)
 workflow.add_node("execute", execution_node)
+workflow.add_node("report", report_node)
 
 workflow.add_edge(START, "review")
 workflow.add_conditional_edges("review", route_review, {"tools": "tools", "hypothesis": "hypothesis"})
@@ -169,7 +190,8 @@ workflow.add_edge("tools", "review")
 workflow.add_edge("hypothesis", "code")
 workflow.add_edge("code", "critic")
 workflow.add_conditional_edges("critic", route_critic, {"code": "code", "execute": "execute", END: END})
-workflow.add_edge("execute", END)
+workflow.add_edge("execute", "report")
+workflow.add_edge("report", END)
 
 os.makedirs("volumes", exist_ok=True)
 
