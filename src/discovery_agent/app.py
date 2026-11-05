@@ -2,10 +2,9 @@
 
 import os
 import sys
+import uuid
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-import uuid
 
 import streamlit as st
 
@@ -39,12 +38,14 @@ with st.sidebar:
 if st.session_state.is_running:
     st.info(f"**Active Thread ID:** `{st.session_state.thread_id}`")
 
-    with st.spinner("Agents are executing the discovery graph (Review -> Hypothesis -> Code -> Critic)..."):
+    with st.status("Executing LangGraph Pipeline...", expanded=True) as status:
+        st.write("Cycling through Review, Hypothesis, Code, Critic, and Execution nodes...")
         try:
             final_state = run_discovery(topic=st.session_state.topic, thread_id=st.session_state.thread_id)
             st.session_state.final_state = final_state
-            st.success("Workflow completed successfully!")
+            status.update(label="Workflow completed successfully!", state="complete", expanded=False)
         except Exception as e:
+            status.update(label="Pipeline Failed", state="error")
             st.error(f"Execution Error: {str(e)}")
         finally:
             st.session_state.is_running = False
@@ -61,6 +62,7 @@ if "final_state" in st.session_state:
         if state.get("memory_summary"):
             st.markdown("### Agent Memory Summary")
             st.info(state["memory_summary"])
+
         code_attempts = state.get("code_attempts", [])
         if code_attempts:
             st.markdown(f"### Code Execution Attempts ({len(code_attempts)})")
@@ -70,8 +72,11 @@ if "final_state" in st.session_state:
 
     with col2:
         st.subheader("SQLite Checkpoint State")
-        raw_status = get_run_status(st.session_state.thread_id)
-        if raw_status:
-            st.json(raw_status)
-        else:
-            st.warning("No checkpoint data found in volumes/checkpoints.sqlite")
+        try:
+            raw_status = get_run_status(st.session_state.thread_id)
+            if raw_status:
+                st.json(raw_status)
+            else:
+                st.warning("No checkpoint data found in volumes/checkpoints.sqlite")
+        except Exception as e:
+            st.error(f"Could not load checkpoint status: {str(e)}")

@@ -34,6 +34,7 @@ services:
   discovery-agent:
     build: .
     container_name: discovery_agent_ui
+    command: ["streamlit", "run", "src/discovery_agent/app.py", "--server.address=0.0.0.0"]
     ports:
       - "8501:8501"
     environment:
@@ -42,5 +43,6 @@ services:
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
     volumes:
       - ./volumes:/app/volumes
+      - ./:/app
     depends_on:
       - milvus
