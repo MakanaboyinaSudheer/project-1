@@ -11,6 +11,7 @@ from discovery_agent.graph.state import ResearchState, trace_event
 from discovery_agent.synthesis.latex import (
     _best_attempt,
     _citation_context,
+    compile_paper,
     render_abstract,
     render_bibliography,
     render_paper,
@@ -71,6 +72,7 @@ def synthesizer_node(state: ResearchState) -> dict:
     citations = state["hypothesis"].citations
     bibliography = render_bibliography(citations)
     markdown = _render_markdown(state)
+    compilation = {"status": "not_requested", "compiler": "", "message": ""}
 
     run_id = state.get("thread_id")
     if run_id:
@@ -86,9 +88,16 @@ def synthesizer_node(state: ResearchState) -> dict:
         }
         for filename, content in artifacts.items():
             (output_dir / filename).write_text(content, encoding="utf-8")
+        compilation = compile_paper(output_dir / "paper.tex")
 
     return {
         "abstract_latex": abstract,
         "draft_markdown": markdown,
-        "trace": [trace_event("synthesizer", "Rendered LaTeX and Markdown research drafts.")],
+        "latex_compilation": compilation,
+        "trace": [
+            trace_event(
+                "synthesizer",
+                f"Rendered LaTeX and Markdown research drafts; PDF compilation {compilation['status']}.",
+            )
+        ],
     }

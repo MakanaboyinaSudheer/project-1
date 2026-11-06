@@ -1,6 +1,7 @@
 """Tests for LaTeX and Markdown research-draft synthesis."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -15,6 +16,7 @@ from discovery_agent.schemas import (
 )
 from discovery_agent.synthesis.latex import (
     citation_key,
+    compile_paper,
     render_abstract,
     render_bibliography,
     render_paper,
@@ -120,6 +122,8 @@ def test_synthesis_node_writes_all_artifacts_and_returns_state(tmp_path, monkeyp
     assert "0.8" not in paper
     assert "paperpubmed123" in (run_dir / "refs.bib").read_text(encoding="utf-8")
     assert result["trace"][0]["node"] == "synthesizer"
+    assert result["latex_compilation"]["status"] in {"compiled", "unavailable"}
+    assert "PDF compilation" in result["trace"][0]["summary"]
 
 
 def test_synthesizer_requires_a_hypothesis() -> None:
@@ -197,3 +201,60 @@ def test_bibliography_disambiguates_ids_that_sanitize_to_same_key() -> None:
     ]
     assert len(set(keys)) == 2
     assert all(key in abstract for key in keys)
+
+
+def test_compile_paper_reports_missing_compiler(tmp_path, monkeypatch) -> None:
+    paper = tmp_path / "paper.tex"
+    paper.write_text(r"\documentclass{article}\begin{document}Draft\end{document}", encoding="utf-8")
+    monkeypatch.setattr("discovery_agent.synthesis.latex.shutil.which", lambda _: None)
+
+    result = compile_paper(paper)
+
+    assert result == {
+        "status": "unavailable",
+        "compiler": "",
+        "message": "Install Tectonic or pdfLaTeX to produce paper.pdf.",
+    }
+
+
+def test_compile_paper_runs_compiler_and_requires_pdf(tmp_path, monkeypatch) -> None:
+    paper = tmp_path / "paper.tex"
+    paper.write_text(r"\documentclass{article}\begin{document}Draft\end{document}", encoding="utf-8")
+    monkeypatch.setattr(
+        "discovery_agent.synthesis.latex.shutil.which",
+        lambda name: "tectonic.exe" if name == "tectonic" else None,
+    )
+    commands = []
+
+    def fake_run(command, **kwargs):
+        commands.append((command, kwargs))
+        paper.with_suffix(".pdf").write_bytes(b"pdf")
+        return type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+    monkeypatch.setattr("discovery_agent.synthesis.latex.subprocess.run", fake_run)
+
+    result = compile_paper(paper)
+
+    assert result["status"] == "compiled"
+    assert result["compiler"] == "tectonic"
+    assert Path(result["pdf_path"]) == paper.with_suffix(".pdf")
+    assert commands[0][0][-1] == "paper.tex"
+    assert commands[0][1]["cwd"] == tmp_path
+
+
+def test_compile_paper_reports_compiler_errors(tmp_path, monkeypatch) -> None:
+    paper = tmp_path / "paper.tex"
+    paper.write_text(r"\documentclass{article}\begin{document}Draft\end{document}", encoding="utf-8")
+    monkeypatch.setattr(
+        "discovery_agent.synthesis.latex.shutil.which",
+        lambda name: "tectonic.exe" if name == "tectonic" else None,
+    )
+    monkeypatch.setattr(
+        "discovery_agent.synthesis.latex.subprocess.run",
+        lambda *_args, **_kwargs: type(
+            "Result", (), {"returncode": 1, "stdout": "", "stderr": "bad LaTeX"}
+        )(),
+    )
+
+    with pytest.raises(RuntimeError, match="bad LaTeX"):
+        compile_paper(paper)

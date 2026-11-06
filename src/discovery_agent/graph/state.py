@@ -38,6 +38,7 @@ class ResearchState(TypedDict, total=False):
     # Synthesis
     abstract_latex: str
     draft_markdown: str
+    latex_compilation: dict[str, str]
 
     # Bookkeeping (dashboard reads these)
     status: Literal["running", "succeeded", "failed"]
