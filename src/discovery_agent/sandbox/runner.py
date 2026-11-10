@@ -1,8 +1,12 @@
 """Execute generated Python code in a disposable Docker container."""
 
+import base64
+import binascii
+import io
 import json
 import logging
 import os
+import secrets
 import tarfile
 import tempfile
 import time
@@ -19,11 +23,6 @@ from discovery_agent.config import settings
 from discovery_agent.schemas import ExecutionResult
 
 logger = logging.getLogger(__name__)
-
-
-def _decode_logs(container, *, stdout: bool) -> str:
-    logs = container.logs(stdout=stdout, stderr=not stdout)
-    return logs.decode("utf-8", errors="replace") if isinstance(logs, bytes) else str(logs)
 
 
 def _collect_artifacts(output_dir: Path) -> tuple[dict[str, str], dict]:
@@ -53,54 +52,94 @@ def _collect_artifacts(output_dir: Path) -> tuple[dict[str, str], dict]:
     return artifacts, metrics
 
 
-def _collect_output_archive(container, output_dir: Path, max_bytes: int) -> None:
+def _collect_output_archive(archive_data: bytes, output_dir: Path, max_bytes: int) -> None:
     """Safely copy the size-limited container tmpfs output into the attempt directory."""
-    archive_chunks, _ = container.get_archive("/output")
     archive_limit = max_bytes + 10 * 1024 * 1024
-    with tempfile.TemporaryFile(mode="w+b") as archive_file:
-        archive_size = 0
-        for chunk in archive_chunks:
-            archive_size += len(chunk)
-            if archive_size > archive_limit:
-                raise ValueError("Sandbox output archive exceeds the configured size limit")
-            archive_file.write(chunk)
-        archive_file.seek(0)
+    if len(archive_data) > archive_limit:
+        raise ValueError("Sandbox output archive exceeds the configured size limit")
 
-        with tarfile.open(fileobj=archive_file, mode="r:*") as archive:
-            members = archive.getmembers()
-            if len(members) > 10_000:
-                raise ValueError("Sandbox output archive contains too many entries")
-            total_size = 0
-            for member in members:
-                parts = PurePosixPath(member.name).parts
-                if parts and parts[0] == "output":
-                    parts = parts[1:]
-                if not parts or any(part in {"", ".", ".."} for part in parts):
-                    if member.isdir() and parts == ():
-                        continue
-                    raise ValueError(f"Unsafe path in sandbox output archive: {member.name!r}")
-
-                target = output_dir.joinpath(*parts)
-                if not target.resolve().is_relative_to(output_dir.resolve()):
-                    raise ValueError(f"Sandbox output path escapes the output directory: {member.name!r}")
-                if member.isdir():
-                    target.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(fileobj=io.BytesIO(archive_data), mode="r:*") as archive:
+        members = archive.getmembers()
+        if len(members) > 10_000:
+            raise ValueError("Sandbox output archive contains too many entries")
+        total_size = 0
+        for member in members:
+            parts = PurePosixPath(member.name).parts
+            if parts and parts[0] == "output":
+                parts = parts[1:]
+            if not parts or any(part in {"", ".", ".."} for part in parts):
+                if member.isdir() and parts == ():
                     continue
-                if not member.isfile():
-                    raise ValueError(f"Unsupported sandbox output entry: {member.name!r}")
+                raise ValueError(f"Unsafe path in sandbox output archive: {member.name!r}")
 
-                total_size += member.size
-                if total_size > max_bytes:
-                    raise ValueError("Sandbox output exceeds the configured size limit")
-                if target.is_symlink():
-                    raise ValueError(f"Sandbox output cannot replace a symlink: {member.name!r}")
-                target.parent.mkdir(parents=True, exist_ok=True)
-                source = archive.extractfile(member)
-                if source is None:
-                    raise ValueError(f"Unable to read sandbox output file: {member.name!r}")
-                with source, target.open("wb") as destination:
-                    while block := source.read(1024 * 1024):
-                        destination.write(block)
+            target = output_dir.joinpath(*parts)
+            if not target.resolve().is_relative_to(output_dir.resolve()):
+                raise ValueError(f"Sandbox output path escapes the output directory: {member.name!r}")
+            if member.isdir():
+                target.mkdir(parents=True, exist_ok=True)
+                continue
+            if not member.isfile():
+                raise ValueError(f"Unsupported sandbox output entry: {member.name!r}")
+
+            total_size += member.size
+            if total_size > max_bytes:
+                raise ValueError("Sandbox output exceeds the configured size limit")
+            if target.is_symlink():
+                raise ValueError(f"Sandbox output cannot replace a symlink: {member.name!r}")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            source = archive.extractfile(member)
+            if source is None:
+                raise ValueError(f"Unable to read sandbox output file: {member.name!r}")
+            with source, target.open("wb") as destination:
+                while block := source.read(1024 * 1024):
+                    destination.write(block)
+
+
+def _launcher_script(archive_token: str) -> str:
+    return f"""
+import base64
+import io
+from pathlib import Path
+import subprocess
+import sys
+import tarfile
+
+result = subprocess.run(
+    [sys.executable, "/workspace/main.py"],
+)
+archive_buffer = io.BytesIO()
+output_dir = Path("/output")
+with tarfile.open(fileobj=archive_buffer, mode="w") as archive:
+    for path in sorted(output_dir.rglob("*")):
+        archive.add(
+            path,
+            arcname=f"output/{{path.relative_to(output_dir).as_posix()}}",
+            recursive=False,
+        )
+encoded_archive = base64.b64encode(archive_buffer.getvalue())
+sys.stdout.buffer.write(b"__DISCOVERY_OUTPUT_BEGIN_{archive_token}__")
+sys.stdout.buffer.write(encoded_archive)
+sys.stdout.buffer.write(b"__DISCOVERY_OUTPUT_END_{archive_token}__")
+exit_code = result.returncode if result.returncode >= 0 else 128 - result.returncode
+sys.exit(exit_code)
+"""
+
+
+def _split_output_archive(stdout: bytes, archive_token: str) -> tuple[bytes, bytes | None]:
+    begin = f"__DISCOVERY_OUTPUT_BEGIN_{archive_token}__".encode("ascii")
+    end = f"__DISCOVERY_OUTPUT_END_{archive_token}__".encode("ascii")
+    start_index = stdout.rfind(begin)
+    if start_index < 0:
+        return stdout, None
+    end_index = stdout.find(end, start_index + len(begin))
+    if end_index < 0:
+        raise ValueError("Sandbox output archive marker is incomplete")
+    encoded_archive = stdout[start_index + len(begin) : end_index]
+    try:
+        archive = base64.b64decode(encoded_archive, validate=True)
+    except binascii.Error as exc:
+        raise ValueError("Sandbox output archive is not valid base64") from exc
+    return stdout[:start_index], archive
 
 
 def _collect_resource_usage(container) -> tuple[dict[str, int | float], str | None]:
@@ -160,6 +199,7 @@ def run_code(code: str, run_dir: Path, timeout_s: int | None = None) -> Executio
     if output_limit_mb <= 0:
         raise ValueError("sandbox_output_limit_mb must be greater than zero")
     output_limit_bytes = output_limit_mb * 1024 * 1024
+    archive_token = secrets.token_hex(16)
     script_path = workspace_dir / "main.py"
     temporary_script: Path | None = None
     try:
@@ -186,7 +226,7 @@ def run_code(code: str, run_dir: Path, timeout_s: int | None = None) -> Executio
     try:
         container = client.containers.run(
             settings.sandbox_image,
-            command=["/workspace/main.py"],
+            command=["-c", _launcher_script(archive_token)],
             detach=True,
             volumes={
                 str(workspace_dir): {"bind": "/workspace", "mode": "ro"},
@@ -220,9 +260,15 @@ def run_code(code: str, run_dir: Path, timeout_s: int | None = None) -> Executio
             result = container.wait(timeout=10)
             exit_code = int(result["StatusCode"])
 
-        stdout = _decode_logs(container, stdout=True)
-        stderr = _decode_logs(container, stdout=False)
-        _collect_output_archive(container, output_dir, output_limit_bytes)
+        stdout_bytes = container.logs(stdout=True, stderr=False)
+        stdout_bytes, archive_data = _split_output_archive(stdout_bytes, archive_token)
+        stderr_bytes = container.logs(stdout=False, stderr=True)
+        stdout = stdout_bytes.decode("utf-8", errors="replace")
+        stderr = stderr_bytes.decode("utf-8", errors="replace")
+        if archive_data is not None:
+            _collect_output_archive(archive_data, output_dir, output_limit_bytes)
+        elif not timed_out and exit_code == 0:
+            raise RuntimeError("Sandbox completed without returning its output archive")
         artifacts, metrics = _collect_artifacts(output_dir)
         resource_usage, resource_usage_error = _collect_resource_usage(container)
         return ExecutionResult(

@@ -1,5 +1,6 @@
 """Defensive regression tests for the sandbox's container isolation controls."""
 
+import base64
 import tarfile
 from io import BytesIO
 from pathlib import Path
@@ -20,11 +21,22 @@ def _empty_output_archive() -> bytes:
 def test_runner_passes_required_isolation_and_resource_limits(monkeypatch, tmp_path: Path) -> None:
     container = MagicMock()
     container.wait.return_value = {"StatusCode": 0}
-    container.logs.return_value = b""
     container.stats.return_value = {}
-    container.get_archive.return_value = ([_empty_output_archive()], {})
     client = MagicMock()
-    client.containers.run.return_value = container
+
+    def run_container(*args, **kwargs):
+        token = kwargs["command"][1].split("_BEGIN_")[1].split("__")[0]
+        archive = base64.b64encode(_empty_output_archive())
+        container.logs.side_effect = lambda *, stdout, stderr: (
+            f"__DISCOVERY_OUTPUT_BEGIN_{token}__".encode()
+            + archive
+            + f"__DISCOVERY_OUTPUT_END_{token}__".encode()
+            if stdout
+            else b""
+        )
+        return container
+
+    client.containers.run.side_effect = run_container
     monkeypatch.setattr(runner.docker, "from_env", lambda: client)
 
     runner.run_code("pass", tmp_path / "attempt", timeout_s=5)

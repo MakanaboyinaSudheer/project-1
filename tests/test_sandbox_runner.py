@@ -1,3 +1,4 @@
+import base64
 import tarfile
 from io import BytesIO
 from pathlib import Path
@@ -16,6 +17,7 @@ class FakeContainer:
         self.wait_calls = 0
         self.killed = False
         self.removed = False
+        self.archive_token = None
         self.stats_result = {
             "memory_stats": {"usage": 1024, "limit": 2048, "max_usage": 1536},
             "cpu_stats": {
@@ -37,19 +39,19 @@ class FakeContainer:
         return result
 
     def logs(self, *, stdout: bool, stderr: bool) -> bytes:
-        return b"standard output\n" if stdout else b"standard error\n"
-
-    def stats(self, *, stream: bool) -> dict:
-        assert stream is False
-        return self.stats_result
-
-    def get_archive(self, path: str):
-        assert path == "/output"
+        if not stdout:
+            return b"standard error\n"
         stream = BytesIO()
         with tarfile.open(fileobj=stream, mode="w") as archive:
             for output_path in self.output_dir.rglob("*"):
                 archive.add(output_path, arcname=f"output/{output_path.relative_to(self.output_dir)}")
-        return [stream.getvalue()], {}
+        begin = f"__DISCOVERY_OUTPUT_BEGIN_{self.archive_token}__".encode()
+        end = f"__DISCOVERY_OUTPUT_END_{self.archive_token}__".encode()
+        return b"standard output\n" + begin + base64.b64encode(stream.getvalue()) + end
+
+    def stats(self, *, stream: bool) -> dict:
+        assert stream is False
+        return self.stats_result
 
     def kill(self) -> None:
         self.killed = True
@@ -65,6 +67,7 @@ class FakeContainers:
 
     def run(self, image, **kwargs):
         self.kwargs = {"image": image, **kwargs}
+        self.container.archive_token = kwargs["command"][1].split("_BEGIN_")[1].split("__")[0]
         output_dir = self.container.output_dir
         output_dir.joinpath("metrics.json").write_text('{"p_value": 0.01}', encoding="utf-8")
         output_dir.joinpath("plot.png").write_bytes(b"plot")
@@ -110,7 +113,8 @@ def test_run_code_collects_logs_metrics_and_artifacts(tmp_path, monkeypatch) -> 
     assert set(result.artifacts) == {"metrics.json", "plot.png"}
     assert container.removed is True
     assert client.closed is True
-    assert client.containers.kwargs["command"] == ["/workspace/main.py"]
+    assert client.containers.kwargs["command"][0] == "-c"
+    assert "/workspace/main.py" in client.containers.kwargs["command"][1]
     assert client.containers.kwargs["volumes"][str(attempt_dir / "workspace")]["bind"] == "/workspace"
     assert client.containers.kwargs["network_disabled"] is True
     assert client.containers.kwargs["read_only"] is True
@@ -242,12 +246,11 @@ def test_output_archive_rejects_path_traversal(tmp_path) -> None:
         entry.size = len(b"unsafe")
         archive.addfile(entry, BytesIO(b"unsafe"))
 
-    container = type("FakeArchive", (), {"get_archive": lambda *_: ([stream.getvalue()], {})})()
     output_dir = tmp_path / "output"
     output_dir.mkdir()
 
     with pytest.raises(ValueError, match="Unsafe path"):
-        runner._collect_output_archive(container, output_dir, 1024)
+        runner._collect_output_archive(stream.getvalue(), output_dir, 1024)
 
     assert not (tmp_path / "outside.txt").exists()
 
