@@ -262,7 +262,7 @@ def test_sandbox_survives_fifty_consecutive_runs(tmp_path: Path) -> None:
             timeout_s=10,
         )
         assert result.exit_code == 0, f"attempt {attempt + 1}: {result.stderr}"
-        assert result.metrics == {"ok": True}
+        assert result.metrics == {"ok": True}, result.artifacts
 
 
 @pytest.mark.integration
