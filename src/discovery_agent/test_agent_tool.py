@@ -1,9 +1,19 @@
+"""Simple smoke check for the literature-search agent.
+
+This file is intentionally kept as a self-contained script and is not part of the
+runtime package import path.
+"""
+
+from __future__ import annotations
+
 from langchain_ollama import ChatOllama
 from langgraph.prebuilt import create_react_agent
+
 from tools.milvus_tools import search_research_papers
 
 
-def test_literature_agent():
+def test_literature_agent() -> None:
+    """Initialize the literature research agent and print a sample stream."""
     print("Initializing Agent with Llama 3.1 and Milvus Search Tool...")
 
     llm = ChatOllama(model="llama3.1", base_url="http://ollama:11434", temperature=0)
