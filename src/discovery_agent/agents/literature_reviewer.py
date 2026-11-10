@@ -8,7 +8,7 @@ from discovery_agent.retrieval.retriever import retrieve
 
 def literature_reviewer_node(state: ResearchState) -> dict:
     """Retrieve literature for state['topic']; return `literature` + `literature_summary`."""
-    topic = state.get("research_topic", "")
+    topic = state.get("research_topic") or state.get("topic", "")
     llm = get_llm()
 
     query_chain = SUB_QUERY_PROMPT | llm
@@ -24,3 +24,6 @@ def literature_reviewer_node(state: ResearchState) -> dict:
         "literature_context": retrieved_docs,
         "literature_summary": response.content,
     }
+
+
+review_literature = literature_reviewer_node

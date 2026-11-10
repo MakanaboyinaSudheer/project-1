@@ -41,7 +41,7 @@ HYPOTHESIS_PROMPT = ChatPromptTemplate.from_messages(
 def hypothesis_generator_node(state: ResearchState) -> dict:
     """Produce a structured Hypothesis whose every claim cites a retrieved peer-reviewed chunk.
     Reject/regenerate if any citation's paper_id is not in state['literature_context']."""
-    topic = state.get("research_topic", "")
+    topic = state.get("research_topic") or state.get("topic", "")
     summary = state.get("literature_summary", "")
     feedback = state.get("final_report", "None")
 
@@ -84,3 +84,6 @@ def hypothesis_generator_node(state: ResearchState) -> dict:
         )
 
     return {"hypothesis": hypothesis_obj.model_dump()}
+
+
+generate_hypothesis = hypothesis_generator_node

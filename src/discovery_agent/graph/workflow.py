@@ -1,63 +1,112 @@
-"""Core multi-agent workflow graph for the Discovery Agent."""
+"""Core orchestration workflow for the Discovery Agent."""
 
-import sqlite3
+from __future__ import annotations
 
-from langgraph.checkpoint.sqlite import SqliteSaver
-from langgraph.graph import END, START, StateGraph
+import uuid
+from contextlib import suppress
+from typing import Any
 
-from discovery_agent.agents.code_executor import execute_code
-from discovery_agent.agents.critic import evaluate_results
-from discovery_agent.agents.hypothesis_generator import generate_hypothesis
+from discovery_agent.agents.code_executor import code_executor_node
+from discovery_agent.agents.critic import critic_node
+from discovery_agent.agents.hypothesis_generator import hypothesis_generator_node
+from discovery_agent.agents.literature_reviewer import literature_reviewer_node
+from discovery_agent.agents.synthesizer import synthesizer_node
+from discovery_agent.config import settings
+from discovery_agent.graph.routing import route_after_critic as _route_after_critic
+from discovery_agent.schemas import CriticReport, Hypothesis
 
-# Import agent nodes
-from discovery_agent.agents.literature_reviewer import review_literature
-from discovery_agent.agents.synthesizer import synthesize_report
-from discovery_agent.graph.parallel import route_to_parallel_agents
-from discovery_agent.graph.routing import route_after_critic
+# Backward-compatible aliases expected by the wider codebase.
+execute_code = code_executor_node
+evaluate_results = critic_node
+generate_hypothesis = hypothesis_generator_node
+review_literature = literature_reviewer_node
+synthesize_report = synthesizer_node
 
-# Import your state and routing logic
-from discovery_agent.graph.state_parallel import ParallelResearchState
+_RUN_STATES: dict[str, dict[str, Any]] = {}
 
 
-def create_graph(memory_db_path: str = "checkpoints.sqlite"):
-    """Compiles the multi-agent state machine."""
-    builder = StateGraph(ParallelResearchState)
+def route_after_critic(state: dict[str, Any]) -> str:
+    """Compatibility wrapper that delegates to the shared routing helper."""
+    return _route_after_critic(state)
 
-    # 1. Add all core nodes
-    builder.add_node("literature_reviewer", review_literature)
-    builder.add_node("hypothesis_generator", generate_hypothesis)
-    builder.add_node("code_executor", execute_code)
-    builder.add_node("statistical_critic", evaluate_results)
-    builder.add_node("synthesizer", synthesize_report)
 
-    # 2. Define standard flow
-    builder.add_edge(START, "literature_reviewer")
+def route_after_execution(state: dict[str, Any]) -> str:
+    """Decide whether a completed code attempt should continue to the critic or debug loop."""
+    attempts = state.get("attempts") or []
+    if not attempts:
+        return "failed"
 
-    # 3. Parallel Fan-out (M2.7/M2.8)
-    builder.add_conditional_edges(
-        "literature_reviewer",
-        route_to_parallel_agents,
-        ["hypothesis_generator"],  # Required for LangGraph v1.0 mapping
-    )
+    latest = attempts[-1]
+    result = getattr(latest, "result", None)
+    if isinstance(result, dict):
+        exit_code = result.get("exit_code", 1)
+        timed_out = bool(result.get("timed_out", False))
+    else:
+        exit_code = getattr(result, "exit_code", 1)
+        timed_out = bool(getattr(result, "timed_out", False))
 
-    builder.add_edge("hypothesis_generator", "code_executor")
-    builder.add_edge("code_executor", "statistical_critic")
+    if exit_code == 0 and not timed_out:
+        return "critic"
 
-    # 4. Refinement Loop with Safety Fallbacks (M2.5)
-    builder.add_conditional_edges(
-        "statistical_critic",
-        route_after_critic,
-        {
-            "execution": "synthesizer",  # Approved or Max Iterations Reached
-            "hypothesis_generator": "hypothesis_generator",  # Rejected: Loop back
-            "end": END,
-        },
-    )
+    debug_iteration = int(state.get("debug_iteration", 0) or 0)
+    if debug_iteration >= settings.max_debug_iterations:
+        return "failed"
+    return "debug"
 
-    builder.add_edge("synthesizer", END)
 
-    # 5. Compile with SQLite Checkpointer for resume-after-kill persistence
-    conn = sqlite3.connect(memory_db_path, check_same_thread=False)
-    memory = SqliteSaver(conn)
+def get_run_status(thread_id: str) -> dict[str, Any] | None:
+    """Return the most recent in-memory state for a run thread."""
+    return _RUN_STATES.get(thread_id)
 
-    return builder.compile(checkpointer=memory)
+
+def run_discovery(topic: str, thread_id: str | None = None) -> dict[str, Any]:
+    """Run the core research loop from literature review through synthesis."""
+    thread_id = thread_id or uuid.uuid4().hex
+    state: dict[str, Any] = {
+        "topic": topic,
+        "research_topic": topic,
+        "thread_id": thread_id,
+        "status": "running",
+        "trace": [],
+        "attempts": [],
+        "refinement_iteration": 0,
+        "debug_iteration": 0,
+    }
+
+    while True:
+        state.update(literature_reviewer_node(state))
+        state.update(hypothesis_generator_node(state))
+
+        hypothesis = state.get("hypothesis")
+        if isinstance(hypothesis, dict):
+            with suppress(Exception):
+                state["hypothesis"] = Hypothesis.model_validate(hypothesis)
+
+        state.update(code_executor_node(state))
+        state.update(critic_node(state))
+
+        critique = state.get("critic_report")
+        if isinstance(critique, dict):
+            with suppress(Exception):
+                critique = CriticReport.model_validate(critique)
+                state["critic_report"] = critique
+
+        verdict = getattr(critique, "verdict", None)
+        if verdict == "significant":
+            state.update(synthesizer_node(state))
+            state["status"] = "succeeded"
+            _RUN_STATES[thread_id] = state
+            return state
+
+        if verdict in {"not_significant", "invalid"}:
+            state["refinement_iteration"] = int(state.get("refinement_iteration", 0)) + 1
+            state["final_report"] = getattr(critique, "summary", str(critique))
+            if state["refinement_iteration"] >= 3:
+                state["status"] = "failed"
+                _RUN_STATES[thread_id] = state
+                return state
+            continue
+
+        state["status"] = "failed"
+        _RUN_STATES[thread_id] = state
+        return state

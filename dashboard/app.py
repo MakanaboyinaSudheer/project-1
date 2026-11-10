@@ -355,18 +355,17 @@ def main() -> None:
 
         refresh_intervals = {"Off": None, "5 seconds": 5, "15 seconds": 15}
         refresh_interval = st.selectbox(
-            "Auto-refresh Dashboard",
+            "Auto-refresh",
             options=list(refresh_intervals),
             index=2,
         )
         if st.button("Refresh now"):
             st.rerun()
 
-    @st.fragment(run_every=refresh_intervals[refresh_interval])
-    def render_dashboard() -> None:
-        _render_runs(discover_runs())
+    if refresh_intervals[refresh_interval] is not None:
+        st.caption(f"Auto-refresh is configured for {refresh_intervals[refresh_interval]} seconds.")
 
-    render_dashboard()
+    _render_runs(discover_runs())
 
 
 if __name__ == "__main__":

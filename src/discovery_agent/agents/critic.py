@@ -9,7 +9,7 @@ from scipy import stats
 
 from discovery_agent.graph.state import ResearchState, trace_event
 from discovery_agent.llm import get_llm
-from discovery_agent.schemas import CriticReport, ExecutionResult
+from discovery_agent.schemas import CriticReport, ExecutionResult, Hypothesis
 from discovery_agent.telemetry.costs import CostTracker
 
 
@@ -321,6 +321,8 @@ def critic_node(state: ResearchState) -> dict[str, object]:
         latest_result = attempts[-1].result
         report = statistical_checks(latest_result)
         hypothesis = state.get("hypothesis")
+        if isinstance(hypothesis, dict):
+            hypothesis = Hypothesis.model_validate(hypothesis)
         if hypothesis is not None:
             run_id = state.get("thread_id", "local-run")
             tracker = CostTracker(run_id=run_id)
@@ -357,3 +359,6 @@ def critic_node(state: ResearchState) -> dict[str, object]:
         "critic_report": report,
         "trace": [trace_event("critic", f"Deterministic verdict: {report.verdict}.")],
     }
+
+
+evaluate_results = critic_node
