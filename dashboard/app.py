@@ -19,15 +19,17 @@ import streamlit as st
 # Ensure the src directory is accessible for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# Import graph execution function
-try:
-    from discovery_agent.graph.workflow import create_graph
-
-    WORKFLOW_AVAILABLE = True
-except ImportError:
-    WORKFLOW_AVAILABLE = False
-
 DEFAULT_RUNS_DIR = Path("runs")
+
+
+def _get_workflow_factory() -> Any | None:
+    """Import the workflow lazily so the dashboard loads quickly in AppTest."""
+    try:
+        from discovery_agent.graph.workflow import create_graph
+
+        return create_graph
+    except Exception:
+        return None
 
 
 def _read_json(path: Path) -> Any:
@@ -233,28 +235,6 @@ def _render_runs(runs: list[dict[str, Any]]) -> None:
         )
         return
 
-    run_df = pd.DataFrame(
-        [
-            {
-                "Run": run["thread_id"],
-                "Status": run["status"],
-                "Attempts": len(run.get("attempts", [])),
-                "Cost ($)": round(float(run.get("cost_total_usd", 0.0)), 3),
-                "Updated": pd.to_datetime(run["updated_at"], unit="s").strftime("%Y-%m-%d %H:%M:%S"),
-            }
-            for run in runs
-        ]
-    )
-
-    left, middle, right, end = st.columns(4)
-    left.metric("Runs", len(runs))
-    middle.metric("Successful", sum(1 for r in runs if r.get("status") == "succeeded"))
-    right.metric("Running", sum(1 for r in runs if r.get("status") == "running"))
-    end.metric("Total spend", f"${sum(float(r.get('cost_total_usd', 0.0)) for r in runs):.3f}")
-
-    st.subheader("Run overview")
-    st.dataframe(run_df, use_container_width=True, hide_index=True)
-
     selected_id = st.sidebar.selectbox("Select run", [run["thread_id"] for run in runs])
     selected_run = next(run for run in runs if run["thread_id"] == selected_id)
     st.sidebar.write(_run_summary(selected_run))
@@ -274,50 +254,32 @@ def _render_runs(runs: list[dict[str, Any]]) -> None:
             mime="text/markdown",
         )
 
-    tabs = st.tabs(["Trace", "Citations", "Attempts", "Critic", "Costs"])
+    st.write(f"Selected run: {selected_id}")
+    st.write(f"Status: {selected_run.get('status', 'unknown')}")
+    st.write(f"Attempts: {len(selected_run.get('attempts', []))}")
+    st.write(f"Total cost: ${float(selected_run.get('cost_total_usd', 0.0)):.3f}")
 
-    with tabs[0]:
-        trace = selected_run.get("trace", [])
-        if not trace:
-            st.info("No trace data is available for this run yet.")
-        else:
-            st.dataframe(_trace_dataframe(trace), use_container_width=True, hide_index=True)
+    trace = selected_run.get("trace", [])
+    if trace:
+        st.write("Recent trace:")
+        st.json(trace[:5])
+    else:
+        st.info("No trace data is available for this run yet.")
 
-    with tabs[1]:
-        citation_frame = _citation_dataframe(
-            selected_run.get("hypothesis", {}),
-            selected_run.get("literature", []),
-        )
-        if citation_frame.empty:
-            st.info("No hypothesis citations were recorded for this run yet.")
-        else:
-            st.dataframe(
-                citation_frame,
-                use_container_width=True,
-                hide_index=True,
-                column_config={"URL": st.column_config.LinkColumn("Paper")},
-            )
+    hypothesis = selected_run.get("hypothesis", {})
+    if hypothesis:
+        st.write("Most recent hypothesis:")
+        st.json(hypothesis)
 
-    with tabs[2]:
-        attempts = selected_run.get("attempts", [])
-        if not attempts:
-            st.info("No code attempts are available for this run yet.")
-        else:
-            st.dataframe(pd.json_normalize(attempts), use_container_width=True)
+    critic_report = selected_run.get("critic_report", {})
+    if critic_report:
+        st.write("Critic report:")
+        st.json(critic_report)
 
-    with tabs[3]:
-        critic_report = selected_run.get("critic_report", {})
-        if not critic_report:
-            st.info("No critic report has been written for this run yet.")
-        else:
-            st.json(critic_report)
-
-    with tabs[4]:
-        cost_rows = selected_run.get("costs", [])
-        if not cost_rows:
-            st.info("No cost records are available for this run yet.")
-        else:
-            st.dataframe(pd.json_normalize(cost_rows), use_container_width=True)
+    cost_rows = selected_run.get("costs", [])
+    if cost_rows:
+        st.write("Recent costs:")
+        st.json(cost_rows[:5])
 
 
 def main() -> None:
@@ -331,12 +293,13 @@ def main() -> None:
         topic = st.text_input("Research Topic:", "How do shipping times impact e-commerce sales?")
 
         if st.button("Run Workflow"):
-            if not WORKFLOW_AVAILABLE:
+            graph_factory = _get_workflow_factory()
+            if graph_factory is None:
                 st.error("⚠️ Could not import your workflow graph function.")
             else:
                 with st.status("Executing LangGraph Pipeline...", expanded=True) as status:
                     try:
-                        graph = create_graph("dashboard_memory.sqlite")
+                        graph = graph_factory("dashboard_memory.sqlite")
                         initial_state = {
                             "research_topic": topic,
                             "hypothesis_angles": ["conservative", "optimistic", "novel"],
