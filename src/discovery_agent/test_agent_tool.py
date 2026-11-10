@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from langchain_ollama import ChatOllama
 from langgraph.prebuilt import create_react_agent
-
 from tools.milvus_tools import search_research_papers
 
 

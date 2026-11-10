@@ -30,7 +30,8 @@ def retrieve(query: str, k: int = 8, peer_reviewed_only: bool = False) -> list[R
         except ValueError:
             return 0.0
         now = datetime.now(dt.tzinfo or None)
-        age_days = max(0.0, (now - dt.replace(tzinfo=None if dt.tzinfo is None else dt.tzinfo)).total_seconds() / 86400.0)
+        age_seconds = (now - dt).total_seconds()
+        age_days = max(0.0, age_seconds / 86400.0)
         return max(0.0, 0.2 - (age_days / 3650.0))
 
     ranked = []

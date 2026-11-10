@@ -46,7 +46,9 @@ def run_ingestion(query: str, max_results: int | None = None) -> int:
     for fetcher in (fetch_arxiv, fetch_pubmed):
         try:
             if fetcher is fetch_arxiv:
-                papers.extend(fetcher(query=query, categories=settings.arxiv_category_list, max_results=limit))
+                papers.extend(
+                    fetcher(query=query, categories=settings.arxiv_category_list, max_results=limit)
+                )
             else:
                 papers.extend(fetcher(query=query, max_results=limit))
         except Exception:

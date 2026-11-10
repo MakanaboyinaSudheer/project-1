@@ -19,7 +19,7 @@ def _fallback_vector(text: str, dim: int) -> np.ndarray:
     """Generate a deterministic vector when the external embedding model is unavailable."""
     vector = np.empty(dim, dtype=np.float64)
     for index in range(dim):
-        digest = hashlib.sha256(f"{text}:{index}".encode("utf-8")).digest()
+        digest = hashlib.sha256(f"{text}:{index}".encode()).digest()
         value = int.from_bytes(digest[:8], byteorder="big", signed=False)
         vector[index] = ((value / (2**64 - 1)) * 2.0) - 1.0
     norm = np.linalg.norm(vector)

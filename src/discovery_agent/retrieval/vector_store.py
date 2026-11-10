@@ -74,7 +74,14 @@ class VectorStore:
             if not chunk.text or not chunk.id:
                 continue
             metadata = chunk.metadata or {}
-            source = str(metadata.get("source") or ("pubmed" if chunk.paper_id.startswith("pubmed:") else "arxiv" if chunk.paper_id.startswith("arxiv:") else "unknown"))
+            inferred_source = (
+                "pubmed"
+                if chunk.paper_id.startswith("pubmed:")
+                else "arxiv"
+                if chunk.paper_id.startswith("arxiv:")
+                else "unknown"
+            )
+            source = str(metadata.get("source") or inferred_source)
             peer_reviewed = bool(metadata.get("peer_reviewed") or source == "pubmed")
             published_ts = metadata.get("published_ts") or metadata.get("published") or ""
             if isinstance(published_ts, datetime):
@@ -116,7 +123,15 @@ class VectorStore:
                     limit=max(1, k),
                     filter=query_filter,
                     search_params={"metric_type": "COSINE", "params": {"ef": max(16, k * 4)}},
-                    output_fields=["id", "paper_id", "kind", "source", "peer_reviewed", "published_ts", "text"],
+                    output_fields=[
+                        "id",
+                        "paper_id",
+                        "kind",
+                        "source",
+                        "peer_reviewed",
+                        "published_ts",
+                        "text",
+                    ],
                 )
                 matches: list[RetrievedChunk] = []
                 for hit in results[0]:
