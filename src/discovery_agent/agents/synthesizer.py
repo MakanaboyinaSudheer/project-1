@@ -101,3 +101,6 @@ def synthesizer_node(state: ResearchState) -> dict:
             )
         ],
     }
+
+
+synthesize_report = synthesizer_node

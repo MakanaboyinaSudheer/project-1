@@ -11,7 +11,7 @@ from discovery_agent.llm import get_llm
 from discovery_agent.sandbox.bandit import update_strategy
 from discovery_agent.sandbox.feedback import compute_reward
 from discovery_agent.sandbox.runner import run_code
-from discovery_agent.schemas import CodeAttempt
+from discovery_agent.schemas import CodeAttempt, Hypothesis
 from discovery_agent.telemetry.costs import CostTracker
 
 _SAFE_RUN_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
@@ -57,6 +57,9 @@ def code_executor_node(state: ResearchState) -> dict:
     if hypothesis is None:
         raise ValueError("Cannot execute an experiment without a hypothesis")
 
+    if isinstance(hypothesis, dict):
+        hypothesis = Hypothesis.model_validate(hypothesis)
+
     run_id = state.get("thread_id", "local-run")
     if not isinstance(run_id, str) or not _SAFE_RUN_ID.fullmatch(run_id):
         raise ValueError("thread_id must contain only letters, numbers, dots, underscores, and hyphens")
@@ -97,3 +100,6 @@ def code_executor_node(state: ResearchState) -> dict:
             )
         ],
     }
+
+
+execute_code = code_executor_node
