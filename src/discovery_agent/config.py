@@ -21,18 +21,23 @@ class Settings(BaseSettings):
     # Milvus
     milvus_uri: str = "http://localhost:19530"
     milvus_collection: str = "papers"
+    milvus_allow_memory_fallback: bool = False
 
     # Literature APIs
     ncbi_email: str = ""
     ncbi_api_key: str = ""
     arxiv_categories: str = "cs.LG,cs.AI,q-bio.QM"
     ingest_max_results: int = 50
+    ingest_pdf_dir: str = "data/raw/pdfs"
+    ingest_figure_dir: str = "data/raw/figures"
+    ingest_pdf_max_bytes: int = 50 * 1024 * 1024
 
     # Sandbox
     sandbox_image: str = "discovery-sandbox:latest"
     sandbox_timeout_s: int = 120
     sandbox_mem_limit: str = "2g"
     sandbox_cpus: float = 1.0
+    sandbox_output_limit_mb: int = 128
 
     # Agent loop
     max_debug_iterations: int = 5

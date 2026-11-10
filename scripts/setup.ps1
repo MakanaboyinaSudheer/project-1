@@ -3,12 +3,18 @@
 $ErrorActionPreference = "Stop"
 
 Write-Host "==> Creating virtualenv (.venv, Python 3.12)"
-if (-not (Test-Path .venv)) { py -3.12 -m venv .venv }
+if (-not (Test-Path .venv)) {
+    py -3.12 -m venv .venv
+    if ($LASTEXITCODE -ne 0) { throw "Could not create the Python 3.12 virtual environment." }
+}
 & .\.venv\Scripts\python.exe -m pip install --upgrade pip
+if ($LASTEXITCODE -ne 0) { throw "Could not upgrade pip." }
 & .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+if ($LASTEXITCODE -ne 0) { throw "Could not install project dependencies." }
 
 Write-Host "==> Installing pre-commit hooks"
 & .\.venv\Scripts\pre-commit.exe install
+if ($LASTEXITCODE -ne 0) { throw "Could not install pre-commit hooks." }
 
 if (-not (Test-Path .env)) {
     Copy-Item .env.example .env
@@ -17,6 +23,7 @@ if (-not (Test-Path .env)) {
 
 Write-Host "==> Building sandbox image"
 docker build -t discovery-sandbox:latest sandbox/
+if ($LASTEXITCODE -ne 0) { throw "Could not build the discovery-sandbox image." }
 
 Write-Host "==> Starting Milvus"
 docker compose up -d --wait --wait-timeout 180
@@ -26,4 +33,5 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "==> Verifying infrastructure"
 docker compose ps
+if ($LASTEXITCODE -ne 0) { throw "Could not inspect Docker Compose services." }
 Write-Host "Done. Activate with: .\.venv\Scripts\Activate.ps1 ; then run: discovery-agent check"

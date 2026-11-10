@@ -142,17 +142,17 @@ Interfaces are already stubbed in `src/`. Implement each one behind its existing
 
 **M1.4 Ingestion pipeline (Days 5, 8)**
 - `ingestion/pipeline.py` → `run_ingestion(query, max_results)`; CLI `discovery-agent ingest`.
-- Dedupe by `Paper.id`. Done when a second run on the same query adds 0 chunks. Document scheduling (Task Scheduler / cron).
+- Exclude the fixed holdout before parsing, dedupe by `Paper.id`, and ingest abstract, PDF-body, and described-figure chunks. Done when a second run on the same query adds 0 chunks. Document scheduling (Task Scheduler / cron).
 
 **M1.5 RAG retriever (Days 6–7, 9)**
 - `retrieval/retriever.py` → `retrieve(query, k, peer_reviewed_only)`, with MMR and a recency boost.
 - Done when a test proves `peer_reviewed_only=True` never returns ArXiv chunks.
 
 **M1.6 PDF parser (Days 11–13)**
-- `ingestion/pdf_parser.py`: download, text chunks (≈1000 chars with overlap, `kind="body"`), figures plus captions.
+- `ingestion/pdf_parser.py`: bounded HTTP download to a stable local cache, normalized text chunks (≈1000 chars with overlap, `kind="body"`), embedded figures plus nearby captions.
 
 **M1.7 Figure parser, multimodal (Days 14–15)**
-- `ingestion/figure_parser.py` → `describe_figure(...) -> Chunk(kind="figure")`; LLaVA describes chart type, axes, units, trends and key values.
+- `ingestion/figure_parser.py` → `describe_figure(...) -> Chunk(kind="figure")`; the configured vision model describes chart type, axes, units, trends and visible key values without inventing unreadable details.
 - Done when figures from 5 sample papers are retrievable by semantic query.
 
 **M1.8 Vector Store Index & Benchmarking (Days 16–18)**
@@ -182,10 +182,10 @@ Interfaces are already stubbed in `src/`. Implement each one behind its existing
 ### M3: Execution & Platform (Member 3: MANSI)
 
 **M3.1 CI & Infrastructure (Days 1, 18)**
-- Integration test jobs in GitHub Actions, docker-compose health checks, setup scripts, and environment verification.
+- Unit/lint CI covers Python 3.11 and 3.12; Docker integration tests, compose health checks, setup scripts, and environment verification.
 
 **M3.2 Sandbox runner (Days 2–4, 12, 15)**
-- `sandbox/runner.py`, `sandbox/Dockerfile`: controls from ARCHITECTURE §4.3; collect stdout/stderr, exit code, timeout flag, `/output` artifacts and `metrics.json`. CPU-only torch support, 50-attempt stress testing, container resource monitoring & profiling.
+- `sandbox/runner.py`, `sandbox/Dockerfile`: controls from ARCHITECTURE §4.3; collect stdout/stderr, exit code, timeout flag, bounded `/output` artifacts and `metrics.json`. CPU-only torch support, 50-attempt stress testing, container resource monitoring & profiling.
 
 **M3.3 Code Executor agent (Days 5, 13)**
 - `agents/code_executor.py`: prompt with hypothesis, test plan, sandbox libraries, and `metrics.json` contract; run via M3.2; append `CodeAttempt`. Retry strategies and dependency isolation.

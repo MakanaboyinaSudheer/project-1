@@ -54,6 +54,15 @@ pytest -m integration                      # needs Docker + Milvus
 docker compose down                        # stop Milvus (data persists in ./volumes)
 ```
 
+ArXiv PDFs are cached under `data/raw/pdfs/` and extracted figures under
+`data/raw/figures/`; set `INGEST_PDF_DIR`, `INGEST_FIGURE_DIR`, or
+`INGEST_PDF_MAX_BYTES` in `.env` to change those defaults. Schedule ingestion
+with Task Scheduler or cron as appropriate, and configure a vision-capable
+`VLM_MODEL` if figure descriptions should be generated.
+Milvus is required for persistent ingestion by default. Set
+`MILVUS_ALLOW_MEMORY_FALLBACK=true` only for disposable local development;
+in-memory vector data is lost when the process exits.
+
 ## Troubleshooting
 - **Milvus not ready:** it takes about 60–90 s on first start. Check `docker compose ps` until it shows `healthy`.
 - **`pip install` fails on Windows:** make sure you're using Python 3.12 (`py -3.12 --version`).

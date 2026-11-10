@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+from contextlib import suppress
 from datetime import datetime
 from typing import Any
 
@@ -11,45 +13,123 @@ from discovery_agent.schemas import Chunk, RetrievedChunk
 
 try:
     from pymilvus import MilvusClient
-except Exception:  # pragma: no cover - optional dependency for fallback behavior.
+except ImportError:  # pragma: no cover - optional dependency for explicit fallback mode.
     MilvusClient = None  # type: ignore[assignment]
+
+logger = logging.getLogger(__name__)
+_EMBEDDING_BATCH_SIZE = 128
 
 
 class VectorStore:
-    def __init__(self, uri: str | None = None, collection: str | None = None) -> None:
+    def __init__(
+        self,
+        uri: str | None = None,
+        collection: str | None = None,
+        *,
+        allow_memory_fallback: bool | None = None,
+    ) -> None:
         self.uri = uri or settings.milvus_uri
         self.collection = collection or settings.milvus_collection
+        self.allow_memory_fallback = (
+            settings.milvus_allow_memory_fallback if allow_memory_fallback is None else allow_memory_fallback
+        )
         self._memory_store: dict[str, dict[str, Any]] = {}
         self.client = None
-        if MilvusClient is not None:
-            try:
-                self.client = MilvusClient(uri=self.uri)
-                self.client.list_collections()
-            except Exception:
-                self.client = None
+
+        if MilvusClient is None:
+            self._use_memory_fallback(RuntimeError("pymilvus is unavailable"))
+            return
+
+        client = None
+        try:
+            client = MilvusClient(uri=self.uri)
+            client.list_collections()
+        except Exception as exc:
+            if client is not None:
+                with suppress(Exception):
+                    client.close()
+            self._use_memory_fallback(exc)
+        else:
+            self.client = client
+
+    def _use_memory_fallback(self, error: Exception) -> None:
+        client = self.client
+        self.client = None
+        if client is not None:
+            with suppress(Exception):
+                client.close()
+        if not self.allow_memory_fallback:
+            raise RuntimeError(
+                f"Milvus is unavailable at {self.uri}; persistent vector storage is required"
+            ) from error
+        logger.warning(
+            "Milvus is unavailable at %s; using non-persistent in-memory storage: %s",
+            self.uri,
+            error,
+        )
+        self._memory_store.setdefault(self.collection, {})
+
+    def close(self) -> None:
+        """Close the Milvus client when one was initialized."""
+        if self.client is not None:
+            client = self.client
+            self.client = None
+            client.close()
 
     def ensure_collection(self) -> None:
         """Create collection + index if missing. Fields: id, paper_id, kind, source,
         peer_reviewed, published_ts, text, vector."""
         if self.client is None:
+            if not self.allow_memory_fallback:
+                raise RuntimeError("Milvus is unavailable and in-memory fallback is disabled")
             self._memory_store.setdefault(self.collection, {})
             return
+
+        from pymilvus import DataType
 
         try:
             if self.client.has_collection(collection_name=self.collection):
                 return
+            schema = self.client.create_schema(auto_id=False, enable_dynamic_field=False)
+            schema.add_field(
+                field_name="id",
+                datatype=DataType.VARCHAR,
+                is_primary=True,
+                max_length=512,
+            )
+            schema.add_field(field_name="paper_id", datatype=DataType.VARCHAR, max_length=512)
+            schema.add_field(field_name="kind", datatype=DataType.VARCHAR, max_length=32)
+            schema.add_field(field_name="source", datatype=DataType.VARCHAR, max_length=16)
+            schema.add_field(field_name="peer_reviewed", datatype=DataType.BOOL)
+            schema.add_field(
+                field_name="published_ts",
+                datatype=DataType.VARCHAR,
+                max_length=40,
+            )
+            schema.add_field(
+                field_name="text",
+                datatype=DataType.VARCHAR,
+                max_length=32768,
+            )
+            schema.add_field(
+                field_name="vector",
+                datatype=DataType.FLOAT_VECTOR,
+                dim=settings.embedding_dim,
+            )
+            index_params = self.client.prepare_index_params()
+            index_params.add_index(
+                field_name="vector",
+                index_type="AUTOINDEX",
+                metric_type="COSINE",
+            )
+            index_params.add_index(field_name="peer_reviewed", index_type="INVERTED")
             self.client.create_collection(
                 collection_name=self.collection,
-                dimension=settings.embedding_dim,
-                metric_type="COSINE",
-                auto_id=False,
-                primary_field="id",
-                vector_field="vector",
-                id_type="String",
+                schema=schema,
+                index_params=index_params,
             )
-        except Exception:
-            self.client = None
-            self._memory_store.setdefault(self.collection, {})
+        except Exception as exc:
+            self._use_memory_fallback(exc)
 
     def list_ids(self) -> set[str]:
         if self.client is not None:
@@ -61,56 +141,73 @@ class VectorStore:
                     limit=10000,
                 )
                 return {row.get("id") for row in rows if isinstance(row, dict) and row.get("id")}
-            except Exception:
-                pass
+            except Exception as exc:
+                self._use_memory_fallback(exc)
+        if not self.allow_memory_fallback:
+            raise RuntimeError("Milvus is unavailable and in-memory fallback is disabled")
         return set(self._memory_store.get(self.collection, {}).keys())
 
     def upsert(self, chunks: list[Chunk]) -> int:
         if not chunks:
             return 0
 
+        valid_chunks = [chunk for chunk in chunks if chunk.text and chunk.id]
         records: list[dict[str, Any]] = []
-        for chunk in chunks:
-            if not chunk.text or not chunk.id:
-                continue
-            metadata = chunk.metadata or {}
-            inferred_source = (
-                "pubmed"
-                if chunk.paper_id.startswith("pubmed:")
-                else "arxiv"
-                if chunk.paper_id.startswith("arxiv:")
-                else "unknown"
-            )
-            source = str(metadata.get("source") or inferred_source)
-            peer_reviewed = bool(metadata.get("peer_reviewed") or source == "pubmed")
-            published_ts = metadata.get("published_ts") or metadata.get("published") or ""
-            if isinstance(published_ts, datetime):
-                published_ts = published_ts.isoformat()
-            vector = embed_texts([chunk.text])[0]
-            record = {
-                "id": chunk.id,
-                "paper_id": chunk.paper_id,
-                "kind": chunk.kind,
-                "source": source,
-                "peer_reviewed": peer_reviewed,
-                "published_ts": str(published_ts),
-                "text": chunk.text,
-                "vector": vector,
-            }
-            records.append(record)
-            self._memory_store.setdefault(self.collection, {})[chunk.id] = record
+        for start in range(0, len(valid_chunks), _EMBEDDING_BATCH_SIZE):
+            batch = valid_chunks[start : start + _EMBEDDING_BATCH_SIZE]
+            vectors = embed_texts([chunk.text for chunk in batch])
+            for chunk, vector in zip(batch, vectors, strict=True):
+                metadata = chunk.metadata or {}
+                inferred_source = (
+                    "pubmed"
+                    if chunk.paper_id.startswith("pubmed:")
+                    else "arxiv"
+                    if chunk.paper_id.startswith("arxiv:")
+                    else "unknown"
+                )
+                source = str(metadata.get("source") or inferred_source)
+                peer_reviewed = bool(metadata.get("peer_reviewed") or source == "pubmed")
+                published_ts = metadata.get("published_ts") or metadata.get("published") or ""
+                if isinstance(published_ts, datetime):
+                    published_ts = published_ts.isoformat()
+                records.append(
+                    {
+                        "id": chunk.id,
+                        "paper_id": chunk.paper_id,
+                        "kind": chunk.kind,
+                        "source": source,
+                        "peer_reviewed": peer_reviewed,
+                        "published_ts": str(published_ts),
+                        "text": chunk.text,
+                        "vector": vector,
+                    }
+                )
+
+        if not records:
+            return 0
 
         if self.client is not None:
             try:
                 self.client.upsert(collection_name=self.collection, data=records)
-            except Exception:
-                self.client = None
+            except Exception as exc:
+                self._use_memory_fallback(exc)
+
+        if self.client is None:
+            if not self.allow_memory_fallback:
+                raise RuntimeError("Milvus is unavailable and in-memory fallback is disabled")
+            self._memory_store.setdefault(self.collection, {}).update(
+                {record["id"]: record for record in records}
+            )
 
         return len(records)
 
     def search(self, query: str, k: int = 8, filter_expr: str = "") -> list[RetrievedChunk]:
         if not query.strip():
             return []
+        if k <= 0:
+            raise ValueError("k must be greater than zero")
+        if self.client is None and not self.allow_memory_fallback:
+            raise RuntimeError("Milvus is unavailable and in-memory fallback is disabled")
 
         vector = embed_texts([query])[0]
         query_filter = filter_expr.strip()
@@ -156,14 +253,14 @@ class VectorStore:
                     )
                 if matches:
                     return matches
-            except Exception:
-                self.client = None
+            except Exception as exc:
+                self._use_memory_fallback(exc)
 
         collection = self._memory_store.get(self.collection, {})
         if not collection:
             return []
 
-        matches: list[RetrievedChunk] = []
+        matches = []
         for record in collection.values():
             if query_filter and not self._matches_filter(record, query_filter):
                 continue

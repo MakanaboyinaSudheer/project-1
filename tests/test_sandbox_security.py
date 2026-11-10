@@ -1,5 +1,7 @@
 """Defensive regression tests for the sandbox's container isolation controls."""
 
+import tarfile
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -8,11 +10,19 @@ import pytest
 from discovery_agent.sandbox import runner
 
 
+def _empty_output_archive() -> bytes:
+    stream = BytesIO()
+    with tarfile.open(fileobj=stream, mode="w"):
+        pass
+    return stream.getvalue()
+
+
 def test_runner_passes_required_isolation_and_resource_limits(monkeypatch, tmp_path: Path) -> None:
     container = MagicMock()
     container.wait.return_value = {"StatusCode": 0}
     container.logs.return_value = b""
     container.stats.return_value = {}
+    container.get_archive.return_value = ([_empty_output_archive()], {})
     client = MagicMock()
     client.containers.run.return_value = container
     monkeypatch.setattr(runner.docker, "from_env", lambda: client)
@@ -22,13 +32,11 @@ def test_runner_passes_required_isolation_and_resource_limits(monkeypatch, tmp_p
     kwargs = client.containers.run.call_args.kwargs
     assert kwargs["network_disabled"] is True
     assert kwargs["read_only"] is True
-    assert kwargs["volumes"][str((tmp_path / "attempt" / "workspace").resolve())] == {
-        "bind": "/workspace",
-        "mode": "ro",
-    }
-    assert kwargs["volumes"][str((tmp_path / "attempt" / "output").resolve())] == {
-        "bind": "/output",
-        "mode": "rw",
+    assert kwargs["volumes"] == {
+        str((tmp_path / "attempt" / "workspace").resolve()): {
+            "bind": "/workspace",
+            "mode": "ro",
+        }
     }
     assert kwargs["cap_drop"] == ["ALL"]
     assert kwargs["security_opt"] == ["no-new-privileges:true"]
@@ -37,6 +45,10 @@ def test_runner_passes_required_isolation_and_resource_limits(monkeypatch, tmp_p
     assert kwargs["mem_limit"] == runner.settings.sandbox_mem_limit
     assert kwargs["nano_cpus"] == int(runner.settings.sandbox_cpus * 1_000_000_000)
     assert kwargs["tmpfs"]["/tmp"] == "rw,noexec,nosuid,size=64m"
+    assert kwargs["tmpfs"]["/output"] == (
+        f"rw,noexec,nosuid,nodev,size={runner.settings.sandbox_output_limit_mb}m,"
+        "uid=10001,gid=10001,mode=0700"
+    )
 
 
 @pytest.mark.integration

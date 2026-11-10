@@ -1,3 +1,5 @@
+import tarfile
+from io import BytesIO
 from pathlib import Path
 
 import pytest
@@ -40,6 +42,14 @@ class FakeContainer:
     def stats(self, *, stream: bool) -> dict:
         assert stream is False
         return self.stats_result
+
+    def get_archive(self, path: str):
+        assert path == "/output"
+        stream = BytesIO()
+        with tarfile.open(fileobj=stream, mode="w") as archive:
+            for output_path in self.output_dir.rglob("*"):
+                archive.add(output_path, arcname=f"output/{output_path.relative_to(self.output_dir)}")
+        return [stream.getvalue()], {}
 
     def kill(self) -> None:
         self.killed = True
@@ -104,7 +114,11 @@ def test_run_code_collects_logs_metrics_and_artifacts(tmp_path, monkeypatch) -> 
     assert client.containers.kwargs["volumes"][str(attempt_dir / "workspace")]["bind"] == "/workspace"
     assert client.containers.kwargs["network_disabled"] is True
     assert client.containers.kwargs["read_only"] is True
-    assert client.containers.kwargs["tmpfs"] == {"/tmp": "rw,noexec,nosuid,size=64m"}
+    assert client.containers.kwargs["tmpfs"]["/tmp"] == "rw,noexec,nosuid,size=64m"
+    assert client.containers.kwargs["tmpfs"]["/output"] == (
+        f"rw,noexec,nosuid,nodev,size={runner.settings.sandbox_output_limit_mb}m,"
+        "uid=10001,gid=10001,mode=0700"
+    )
     assert client.containers.kwargs["cap_drop"] == ["ALL"]
     assert client.containers.kwargs["security_opt"] == ["no-new-privileges:true"]
     assert client.containers.kwargs["user"] == "10001:10001"
@@ -169,6 +183,45 @@ def test_run_code_rejects_non_positive_timeout(tmp_path, monkeypatch) -> None:
         runner.run_code("pass", tmp_path / "attempt", timeout_s=0)
 
 
+@pytest.mark.parametrize("mount_name", ["workspace", "output"])
+def test_run_code_rejects_symlinked_mount_directories(tmp_path, monkeypatch, mount_name) -> None:
+    attempt_dir = tmp_path / "attempt"
+    attempt_dir.mkdir()
+    outside_dir = tmp_path / "outside"
+    outside_dir.mkdir()
+    try:
+        (attempt_dir / mount_name).symlink_to(outside_dir, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"Directory symlinks are unavailable: {exc}")
+
+    monkeypatch.setattr(runner.docker, "from_env", lambda: pytest.fail("Docker should not be initialized"))
+
+    with pytest.raises(ValueError, match="must not be a symlink"):
+        runner.run_code("pass", attempt_dir, timeout_s=5)
+
+    assert list(outside_dir.iterdir()) == []
+
+
+def test_run_code_atomically_replaces_a_symlinked_script_path(tmp_path, monkeypatch) -> None:
+    attempt_dir = tmp_path / "attempt"
+    workspace_dir = attempt_dir / "workspace"
+    workspace_dir.mkdir(parents=True)
+    outside_script = tmp_path / "host-script.py"
+    outside_script.write_text("host contents", encoding="utf-8")
+    try:
+        (workspace_dir / "main.py").symlink_to(outside_script)
+    except OSError as exc:
+        pytest.skip(f"File symlinks are unavailable: {exc}")
+    output_dir = attempt_dir / "output"
+    container = FakeContainer([{"StatusCode": 0}], output_dir)
+    install_fake_docker(monkeypatch, container)
+
+    runner.run_code("print('safe')", attempt_dir, timeout_s=5)
+
+    assert outside_script.read_text(encoding="utf-8") == "host contents"
+    assert (workspace_dir / "main.py").read_text(encoding="utf-8") == "print('safe')"
+
+
 def test_resource_stats_failure_is_reported_without_discarding_execution(tmp_path, monkeypatch) -> None:
     container = FakeContainer([{"StatusCode": 0}], tmp_path / "attempt" / "output")
     client = install_fake_docker(monkeypatch, container)
@@ -180,6 +233,23 @@ def test_resource_stats_failure_is_reported_without_discarding_execution(tmp_pat
     assert result.resource_usage == {}
     assert result.resource_usage_error == "APIError: stats unavailable"
     assert client.closed is True
+
+
+def test_output_archive_rejects_path_traversal(tmp_path) -> None:
+    stream = BytesIO()
+    with tarfile.open(fileobj=stream, mode="w") as archive:
+        entry = tarfile.TarInfo("../outside.txt")
+        entry.size = len(b"unsafe")
+        archive.addfile(entry, BytesIO(b"unsafe"))
+
+    container = type("FakeArchive", (), {"get_archive": lambda *_: ([stream.getvalue()], {})})()
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    with pytest.raises(ValueError, match="Unsafe path"):
+        runner._collect_output_archive(container, output_dir, 1024)
+
+    assert not (tmp_path / "outside.txt").exists()
 
 
 @pytest.mark.integration

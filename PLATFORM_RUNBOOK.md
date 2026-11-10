@@ -5,6 +5,7 @@
 - Python 3.12 (the package supports Python 3.11 and 3.12)
 - Docker Desktop on Windows or Docker Engine with Compose v2 on Linux/macOS
 - An LLM provider configured in `.env` for `discovery-agent check`
+- A healthy Milvus service; in-memory vector fallback is disabled by default
 
 ## First-time setup
 
@@ -51,11 +52,12 @@ services to be healthy.
 ## Sandbox operation
 
 Generated code runs in an isolated container with networking disabled, a
-read-only root filesystem, a read-only `/workspace`, a writable `/output`, a
-non-root UID, dropped Linux capabilities, no-new-privileges, and configured
-CPU, memory, process, and wall-clock limits. Artifacts and `metrics.json` are
-collected under `runs/<run-id>/attempt_<n>/output/`. Resource counters are
-included in each execution result; a `resource_usage_error` field indicates
+read-only root filesystem, a read-only `/workspace`, a size-limited `/output`
+tmpfs, a non-root UID, dropped Linux capabilities, no-new-privileges, and
+configured CPU, memory, process, and wall-clock limits. Output files are
+validated and safely copied to `runs/<run-id>/attempt_<n>/output/`. Set
+`SANDBOX_OUTPUT_LIMIT_MB` to change the default 128 MiB cap. Resource counters
+are included in each execution result; a `resource_usage_error` field indicates
 when Docker could not provide those counters.
 
 The repair-strategy bandit is shared across runs at `runs/bandit.json`. Preserve
@@ -72,7 +74,7 @@ silently reset.
 - **Docker unavailable:** start Docker Desktop/Engine, then rerun the image and
   Compose checks.
 - **Sandbox execution check fails:** inspect the Docker daemon logs and confirm
-  the configured image and local output volume are accessible.
+  the configured image is available and the Docker API permits archive retrieval.
 - **LLM check fails:** verify `.env`, provider credentials, model name, and
   network/provider availability.
 

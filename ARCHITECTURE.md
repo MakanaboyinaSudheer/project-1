@@ -71,8 +71,15 @@ flowchart LR
   ArXiv papers have `peer_reviewed=False`; PubMed journal articles have `peer_reviewed=True`.
 - `pipeline.run_ingestion` fetches, deduplicates by `Paper.id`, chunks, embeds and upserts.
   It is **idempotent**, so it can run on a schedule (cron / Task Scheduler) to keep the DB current.
-- From Week 3, `pdf_parser` pulls body text and figures, and `figure_parser` uses the VLM to
-  describe each chart (type, axes, trend, key values) as a `kind="figure"` chunk.
+- The ingestion pipeline excludes the fixed evaluation holdout before parsing or indexing.
+- Milvus is required for persistent ingestion by default; the non-persistent in-memory
+  fallback is an explicit opt-in for disposable development only.
+- ArXiv PDFs are cached under `INGEST_PDF_DIR` (default `data/raw/pdfs/`), body text is
+  normalized into overlapping `kind="body"` chunks, and extracted images/captions are cached
+  under `INGEST_FIGURE_DIR` (default `data/raw/figures/`). The configured `VLM_MODEL`
+  describes each image as a searchable `kind="figure"` chunk.
+- Retrieval uses maximal marginal relevance (MMR) over a larger candidate set and adds a
+  bounded recency boost, while preserving the peer-reviewed-only filter.
 - The Milvus collection `papers` has the fields `id, paper_id, kind, source, peer_reviewed,
   published_ts, text, vector(384)`, with a scalar index on `peer_reviewed` for filtered RAG.
 
@@ -101,13 +108,13 @@ Every node also appends to `trace` (for the dashboard's logic tree) and `costs`.
 `state["literature"]` and be `peer_reviewed=True`. Otherwise the generator retries.
 
 ### 4.3 Secure sandbox (`sandbox/`)
-The generated code is untrusted. `runner.run_code` writes it to `runs/<id>/attempt_<n>/main.py`
-and runs it in `discovery-sandbox:latest` with:
+The generated code is untrusted. `runner.run_code` writes it to
+`runs/<id>/attempt_<n>/workspace/main.py` and runs it in `discovery-sandbox:latest` with:
 
 | Control | Setting |
 |---|---|
 | Network | `network_disabled=True` |
-| Filesystem | `read_only=True`; code mounted read-only at `/workspace`; only `/output` writable; `tmpfs /tmp` |
+| Filesystem | `read_only=True`; code mounted read-only at `/workspace`; bounded `/output` and `/tmp` tmpfs mounts |
 | Privileges | non-root uid 10001, `cap_drop=["ALL"]`, `no-new-privileges` |
 | Resources | `mem_limit` 2g, `nano_cpus` 1 CPU, `pids_limit` 128 |
 | Time | wall-clock timeout, then the container is killed and removed |
@@ -115,7 +122,8 @@ and runs it in `discovery-sandbox:latest` with:
 
 The contract for experiments: code writes its results to `/output/metrics.json`
 (e.g. `{"test": "t-test", "p_value": 0.01, "ci_95": [0.1, 0.4], "effect_size": 0.6, "n": 200}`)
-and any plots to `/output/*.png`.
+and any plots to `/output/*.png`. The runner safely copies files from the bounded
+container tmpfs after execution and rejects unsafe archive paths.
 All dependencies are baked into the image, because there is no network at runtime.
 
 ### 4.4 Self-debugging RL feedback loop (`sandbox/feedback.py`, `agents/debugger.py`)

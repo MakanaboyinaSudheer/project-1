@@ -1,10 +1,12 @@
 """Execute generated Python code in a disposable Docker container."""
 
 import json
-import os
+import logging
+import tarfile
+import tempfile
 import time
 from contextlib import suppress
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import docker
 from docker.errors import DockerException
@@ -14,6 +16,8 @@ from requests.exceptions import Timeout as DockerTimeout
 
 from discovery_agent.config import settings
 from discovery_agent.schemas import ExecutionResult
+
+logger = logging.getLogger(__name__)
 
 
 def _decode_logs(container, *, stdout: bool) -> str:
@@ -38,11 +42,64 @@ def _collect_artifacts(output_dir: Path) -> tuple[dict[str, str], dict]:
         try:
             parsed_metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
+            logger.warning("Unable to read valid metrics JSON from %s", metrics_path, exc_info=True)
             parsed_metrics = {}
         if isinstance(parsed_metrics, dict):
             metrics = parsed_metrics
+        else:
+            logger.warning("Metrics file must contain a JSON object: %s", metrics_path)
 
     return artifacts, metrics
+
+
+def _collect_output_archive(container, output_dir: Path, max_bytes: int) -> None:
+    """Safely copy the size-limited container tmpfs output into the attempt directory."""
+    archive_chunks, _ = container.get_archive("/output")
+    archive_limit = max_bytes + 10 * 1024 * 1024
+    with tempfile.TemporaryFile(mode="w+b") as archive_file:
+        archive_size = 0
+        for chunk in archive_chunks:
+            archive_size += len(chunk)
+            if archive_size > archive_limit:
+                raise ValueError("Sandbox output archive exceeds the configured size limit")
+            archive_file.write(chunk)
+        archive_file.seek(0)
+
+        with tarfile.open(fileobj=archive_file, mode="r:*") as archive:
+            members = archive.getmembers()
+            if len(members) > 10_000:
+                raise ValueError("Sandbox output archive contains too many entries")
+            total_size = 0
+            for member in members:
+                parts = PurePosixPath(member.name).parts
+                if parts and parts[0] == "output":
+                    parts = parts[1:]
+                if not parts or any(part in {"", ".", ".."} for part in parts):
+                    if member.isdir() and parts == ():
+                        continue
+                    raise ValueError(f"Unsafe path in sandbox output archive: {member.name!r}")
+
+                target = output_dir.joinpath(*parts)
+                if not target.resolve().is_relative_to(output_dir.resolve()):
+                    raise ValueError(f"Sandbox output path escapes the output directory: {member.name!r}")
+                if member.isdir():
+                    target.mkdir(parents=True, exist_ok=True)
+                    continue
+                if not member.isfile():
+                    raise ValueError(f"Unsupported sandbox output entry: {member.name!r}")
+
+                total_size += member.size
+                if total_size > max_bytes:
+                    raise ValueError("Sandbox output exceeds the configured size limit")
+                if target.is_symlink():
+                    raise ValueError(f"Sandbox output cannot replace a symlink: {member.name!r}")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                source = archive.extractfile(member)
+                if source is None:
+                    raise ValueError(f"Unable to read sandbox output file: {member.name!r}")
+                with source, target.open("wb") as destination:
+                    while block := source.read(1024 * 1024):
+                        destination.write(block)
 
 
 def _collect_resource_usage(container) -> tuple[dict[str, int | float], str | None]:
@@ -74,6 +131,18 @@ def _collect_resource_usage(container) -> tuple[dict[str, int | float], str | No
     return usage, None
 
 
+def _create_attempt_directory(path: Path, attempt_dir: Path) -> Path:
+    if path.is_symlink():
+        raise ValueError(f"Sandbox mount directory must not be a symlink: {path}")
+    path.mkdir(parents=True, exist_ok=True)
+    resolved = path.resolve(strict=True)
+    if not resolved.is_relative_to(attempt_dir):
+        raise ValueError(f"Sandbox mount directory must remain inside the attempt directory: {path}")
+    if not resolved.is_dir():
+        raise ValueError(f"Sandbox mount path must be a directory: {path}")
+    return resolved
+
+
 def run_code(code: str, run_dir: Path, timeout_s: int | None = None) -> ExecutionResult:
     """Run code and collect its output, exit status, and files written to ``/output``."""
     timeout = settings.sandbox_timeout_s if timeout_s is None else timeout_s
@@ -81,12 +150,32 @@ def run_code(code: str, run_dir: Path, timeout_s: int | None = None) -> Executio
         raise ValueError("timeout_s must be greater than zero")
 
     attempt_dir = Path(run_dir).resolve()
-    workspace_dir = attempt_dir / "workspace"
-    output_dir = attempt_dir / "output"
-    workspace_dir.mkdir(parents=True, exist_ok=True)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    os.chmod(output_dir, 0o777)
-    (workspace_dir / "main.py").write_text(code, encoding="utf-8")
+    attempt_dir.mkdir(parents=True, exist_ok=True)
+    workspace_dir = _create_attempt_directory(attempt_dir / "workspace", attempt_dir)
+    output_dir = _create_attempt_directory(attempt_dir / "output", attempt_dir)
+    if any(output_dir.iterdir()):
+        raise ValueError(f"Sandbox output directory must be empty before a run: {output_dir}")
+    output_limit_mb = settings.sandbox_output_limit_mb
+    if output_limit_mb <= 0:
+        raise ValueError("sandbox_output_limit_mb must be greater than zero")
+    output_limit_bytes = output_limit_mb * 1024 * 1024
+    script_path = workspace_dir / "main.py"
+    temporary_script: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=workspace_dir,
+            prefix=".main-",
+            suffix=".tmp",
+            delete=False,
+        ) as script:
+            temporary_script = Path(script.name)
+            script.write(code)
+        temporary_script.replace(script_path)
+    finally:
+        if temporary_script is not None and temporary_script.exists():
+            temporary_script.unlink()
 
     client = docker.from_env()
     container = None
@@ -99,11 +188,13 @@ def run_code(code: str, run_dir: Path, timeout_s: int | None = None) -> Executio
             detach=True,
             volumes={
                 str(workspace_dir): {"bind": "/workspace", "mode": "ro"},
-                str(output_dir): {"bind": "/output", "mode": "rw"},
             },
             network_disabled=True,
             read_only=True,
-            tmpfs={"/tmp": "rw,noexec,nosuid,size=64m"},
+            tmpfs={
+                "/tmp": "rw,noexec,nosuid,size=64m",
+                "/output": (f"rw,noexec,nosuid,nodev,size={output_limit_mb}m,uid=10001,gid=10001,mode=0700"),
+            },
             cap_drop=["ALL"],
             security_opt=["no-new-privileges:true"],
             user="10001:10001",
@@ -129,6 +220,7 @@ def run_code(code: str, run_dir: Path, timeout_s: int | None = None) -> Executio
 
         stdout = _decode_logs(container, stdout=True)
         stderr = _decode_logs(container, stdout=False)
+        _collect_output_archive(container, output_dir, output_limit_bytes)
         artifacts, metrics = _collect_artifacts(output_dir)
         resource_usage, resource_usage_error = _collect_resource_usage(container)
         return ExecutionResult(
