@@ -8,11 +8,24 @@ from __future__ import annotations
 
 import difflib
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 import streamlit as st
+
+# Ensure the src directory is accessible for imports
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# Import graph execution function
+try:
+    from discovery_agent.graph.workflow import create_graph
+
+    WORKFLOW_AVAILABLE = True
+except ImportError:
+    WORKFLOW_AVAILABLE = False
 
 DEFAULT_RUNS_DIR = Path("runs")
 
@@ -53,11 +66,7 @@ def _read_costs(path: Path) -> tuple[float, list[dict[str, Any]]]:
 
 
 def discover_runs(base_dir: str | Path = DEFAULT_RUNS_DIR) -> list[dict[str, Any]]:
-    """Return discovered runs under the project runs directory.
-
-    Each entry exposes enough metadata for the dashboard to render a run list even
-    before the full graph and agents are implemented.
-    """
+    """Return discovered runs under the project runs directory."""
     root = Path(base_dir)
     if not root.exists():
         return []
@@ -185,7 +194,7 @@ def _attempt_rewards(attempts: list[Any]) -> pd.DataFrame:
             continue
         iteration = attempt.get("iteration", index)
         reward = attempt.get("reward")
-        if isinstance(reward, (int, float)) and not isinstance(reward, bool):
+        if isinstance(reward, int | float) and not isinstance(reward, bool):
             rows.append({"Iteration": iteration, "Reward": reward})
     return pd.DataFrame(rows, columns=["Iteration", "Reward"])
 
@@ -222,18 +231,6 @@ def _render_runs(runs: list[dict[str, Any]]) -> None:
         st.info(
             "No run artifacts were found yet. Launch the discovery workflow to populate the runs/ directory."
         )
-        with st.expander("Expected run layout"):
-            st.code(
-                """
-                runs/
-                ├── 2024-01-01T12-00-00/
-                │   ├── state.json
-                │   ├── trace.json
-                │   ├── critic_report.json
-                │   ├── costs.jsonl
-                │   └── attempts.json
-                """.strip()
-            )
         return
 
     run_df = pd.DataFrame(
@@ -261,6 +258,7 @@ def _render_runs(runs: list[dict[str, Any]]) -> None:
     selected_id = st.sidebar.selectbox("Select run", [run["thread_id"] for run in runs])
     selected_run = next(run for run in runs if run["thread_id"] == selected_id)
     st.sidebar.write(_run_summary(selected_run))
+
     st.sidebar.download_button(
         "Export run JSON",
         data=_serialize_run(selected_run),
@@ -284,8 +282,6 @@ def _render_runs(runs: list[dict[str, Any]]) -> None:
             st.info("No trace data is available for this run yet.")
         else:
             st.dataframe(_trace_dataframe(trace), use_container_width=True, hide_index=True)
-            with st.expander("Raw trace data"):
-                st.json(trace)
 
     with tabs[1]:
         citation_frame = _citation_dataframe(
@@ -308,13 +304,6 @@ def _render_runs(runs: list[dict[str, Any]]) -> None:
             st.info("No code attempts are available for this run yet.")
         else:
             st.dataframe(pd.json_normalize(attempts), use_container_width=True)
-            rewards = _attempt_rewards(attempts)
-            if not rewards.empty:
-                st.subheader("Repair reward curve")
-                st.line_chart(rewards.set_index("Iteration"))
-            for attempt_diff in _attempt_diffs(attempts):
-                with st.expander(f"Code changes: attempt {attempt_diff['from']} → {attempt_diff['to']}"):
-                    st.code(attempt_diff["diff"] or "No code changes.", language="diff")
 
     with tabs[3]:
         critic_report = selected_run.get("critic_report", {})
@@ -329,25 +318,49 @@ def _render_runs(runs: list[dict[str, Any]]) -> None:
             st.info("No cost records are available for this run yet.")
         else:
             st.dataframe(pd.json_normalize(cost_rows), use_container_width=True)
-            cost_frame = pd.DataFrame(cost_rows)
-            if {"model", "usd"}.issubset(cost_frame.columns):
-                st.subheader("Cost by model")
-                st.bar_chart(cost_frame.groupby("model", as_index=True)["usd"].sum())
 
 
 def main() -> None:
-    st.set_page_config(page_title="Discovery Agent", layout="wide")
-    st.title("Autonomous Scientific Discovery Agent")
-    st.caption("Browse discovery runs and review their status and summary metrics.")
+    st.set_page_config(page_title="Discovery Agent", page_icon="🔬", layout="wide")
+    st.title("🔬 Autonomous Scientific Discovery Agent")
+    st.caption("Generate hypotheses and browse discovery runs.")
 
-    refresh_intervals = {"Off": None, "5 seconds": 5, "15 seconds": 15}
-    refresh_interval = st.sidebar.selectbox(
-        "Auto-refresh",
-        options=list(refresh_intervals),
-        index=2,
-    )
-    if st.sidebar.button("Refresh now"):
-        st.rerun()
+    # Combined Sidebar: Trigger workflow + Auto-refresh
+    with st.sidebar:
+        st.header("Launch Discovery")
+        topic = st.text_input("Research Topic:", "How do shipping times impact e-commerce sales?")
+
+        if st.button("Run Workflow"):
+            if not WORKFLOW_AVAILABLE:
+                st.error("⚠️ Could not import your workflow graph function.")
+            else:
+                with st.status("Executing LangGraph Pipeline...", expanded=True) as status:
+                    try:
+                        graph = create_graph("dashboard_memory.sqlite")
+                        initial_state = {
+                            "research_topic": topic,
+                            "hypothesis_angles": ["conservative", "optimistic", "novel"],
+                        }
+                        graph.invoke(
+                            initial_state,
+                            config={"configurable": {"thread_id": "dashboard_session_1"}},
+                        )
+                        status.update(label="Pipeline Complete!", state="complete", expanded=False)
+                        st.success("Analysis complete! The run is now available.")
+                    except Exception as e:
+                        status.update(label="Pipeline Failed", state="error")
+                        st.error(f"Execution Error: {str(e)}")
+
+        st.divider()
+
+        refresh_intervals = {"Off": None, "5 seconds": 5, "15 seconds": 15}
+        refresh_interval = st.selectbox(
+            "Auto-refresh Dashboard",
+            options=list(refresh_intervals),
+            index=2,
+        )
+        if st.button("Refresh now"):
+            st.rerun()
 
     @st.fragment(run_every=refresh_intervals[refresh_interval])
     def render_dashboard() -> None:
