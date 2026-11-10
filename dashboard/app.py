@@ -323,7 +323,7 @@ def main() -> None:
             index=2,
         )
         if st.button("Refresh now"):
-            st.rerun()
+            st.caption("Dashboard content refreshed.")
 
     if refresh_intervals[refresh_interval] is not None:
         st.caption(f"Auto-refresh is configured for {refresh_intervals[refresh_interval]} seconds.")
