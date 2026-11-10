@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 import tarfile
 import tempfile
 import time
@@ -172,6 +173,7 @@ def run_code(code: str, run_dir: Path, timeout_s: int | None = None) -> Executio
         ) as script:
             temporary_script = Path(script.name)
             script.write(code)
+        os.chmod(temporary_script, 0o644)
         temporary_script.replace(script_path)
     finally:
         if temporary_script is not None and temporary_script.exists():

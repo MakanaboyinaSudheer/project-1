@@ -139,6 +139,7 @@ class VectorStore:
                     filter="",
                     output_fields=["id"],
                     limit=10000,
+                    consistency_level="Strong",
                 )
                 return {row.get("id") for row in rows if isinstance(row, dict) and row.get("id")}
             except Exception as exc:

@@ -44,6 +44,26 @@ def test_vector_store_rejects_non_positive_search_limit(monkeypatch) -> None:
         store.search("query", k=0)
 
 
+def test_list_ids_uses_strong_consistency(monkeypatch) -> None:
+    class FakeClient:
+        def __init__(self) -> None:
+            self.query_kwargs = None
+
+        def list_collections(self):
+            return []
+
+        def query(self, **kwargs):
+            self.query_kwargs = kwargs
+            return [{"id": "arxiv:1:abstract"}]
+
+    client = FakeClient()
+    monkeypatch.setattr(vector_store, "MilvusClient", lambda **_: client)
+    store = vector_store.VectorStore(collection="test-papers")
+
+    assert store.list_ids() == {"arxiv:1:abstract"}
+    assert client.query_kwargs["consistency_level"] == "Strong"
+
+
 def test_vector_store_batches_embeddings_for_bulk_upserts(monkeypatch) -> None:
     monkeypatch.setattr(vector_store, "MilvusClient", None)
     batch_sizes = []
