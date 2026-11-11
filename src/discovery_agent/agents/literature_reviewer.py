@@ -1,28 +1,35 @@
-"""Literature Reviewer node. Owner: Member 2."""
+"""Literature Reviewer node: retrieve evidence from Milvus and summarise research gaps."""
 
-from discovery_agent.agents.prompts import LITERATURE_REVIEW_PROMPT, SUB_QUERY_PROMPT
-from discovery_agent.graph.state import ResearchState
+from discovery_agent.agents.prompts import LITERATURE_REVIEW_PROMPT
+from discovery_agent.graph.state import ResearchState, trace_event
 from discovery_agent.llm import get_llm
 from discovery_agent.retrieval.retriever import retrieve
+from discovery_agent.telemetry.costs import CostTracker
 
 
 def literature_reviewer_node(state: ResearchState) -> dict:
     """Retrieve literature for state['topic']; return `literature` + `literature_summary`."""
-    topic = state.get("research_topic") or state.get("topic", "")
-    llm = get_llm()
+    topic = state["topic"]
+    literature = retrieve(query=topic, k=10, peer_reviewed_only=state.get("peer_reviewed_only", False))
+    if not literature:
+        raise RuntimeError(
+            f"No literature indexed for {topic!r}. Run `discovery-agent ingest --query ...` first."
+        )
 
-    query_chain = SUB_QUERY_PROMPT | llm
-    _sub_queries = query_chain.invoke({"topic": topic})
-
-    retrieved_docs = retrieve(query=topic, k=10, peer_reviewed_only=True)
-    context_text = "\n\n".join([str(doc) for doc in retrieved_docs])
-
-    chain = LITERATURE_REVIEW_PROMPT | llm
-    response = chain.invoke({"topic": topic, "context": context_text})
-
+    context = "\n\n".join(
+        f"[{chunk.paper_id}] {chunk.metadata.get('title', '')}\n{chunk.text}" for chunk in literature
+    )
+    tracker = CostTracker(run_id=state.get("thread_id", "local-run"))
+    response = (LITERATURE_REVIEW_PROMPT | get_llm()).invoke(
+        {"topic": topic, "context": context}, config={"callbacks": [tracker]}
+    )
+    papers = len({chunk.paper_id for chunk in literature})
     return {
-        "literature_context": retrieved_docs,
-        "literature_summary": response.content,
+        "literature": literature,
+        "literature_summary": str(response.content),
+        "trace": [
+            trace_event("literature_reviewer", f"Retrieved {len(literature)} chunks from {papers} papers.")
+        ],
     }
 
 

@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     ingest_pdf_dir: str = "data/raw/pdfs"
     ingest_figure_dir: str = "data/raw/figures"
     ingest_pdf_max_bytes: int = 50 * 1024 * 1024
+    paper_catalog: str = "data/papers.json"
 
     # Sandbox
     sandbox_image: str = "discovery-sandbox:latest"

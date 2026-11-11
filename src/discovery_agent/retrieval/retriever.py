@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from discovery_agent.ingestion.catalog import load_catalog
 from discovery_agent.retrieval.embeddings import embed_texts
 from discovery_agent.retrieval.vector_store import VectorStore
 from discovery_agent.schemas import RetrievedChunk
@@ -24,6 +25,10 @@ def retrieve(query: str, k: int = 8, peer_reviewed_only: bool = False) -> list[R
         store.close()
     if not results:
         return []
+    catalog = load_catalog()
+    for chunk in results:
+        paper = catalog.get(chunk.paper_id, {})
+        chunk.metadata = {**chunk.metadata, **{k: paper[k] for k in ("title", "url") if paper.get(k)}}
 
     def _recency_boost(chunk: RetrievedChunk) -> float:
         metadata = chunk.metadata or {}

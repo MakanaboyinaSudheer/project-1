@@ -17,6 +17,7 @@ htmlcov/
 
 # Local data / runtime artifacts
 data/raw/
+data/papers.json
 data/pdfs/
 data/figures/
 runs/

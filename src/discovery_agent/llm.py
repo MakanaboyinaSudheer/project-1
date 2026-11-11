@@ -12,7 +12,10 @@ from discovery_agent.config import settings
 
 def get_llm(model: str | None = None, temperature: float | None = None) -> BaseChatModel:
     spec = model or settings.llm_model
-    kwargs: dict = {"temperature": settings.llm_temperature if temperature is None else temperature}
+    kwargs: dict = {}
+    # Current Claude models reject non-default sampling parameters; other providers honour them.
+    if not spec.startswith("anthropic:"):
+        kwargs["temperature"] = settings.llm_temperature if temperature is None else temperature
     if spec.startswith("ollama:"):
         kwargs["base_url"] = settings.ollama_base_url
     return init_chat_model(spec, **kwargs)

@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from collections import Counter
 from pathlib import Path
 
 from discovery_agent.config import settings
 from discovery_agent.evaluation.holdout import exclude_holdout_papers
 from discovery_agent.ingestion.arxiv_client import fetch_arxiv
+from discovery_agent.ingestion.catalog import record_papers
 from discovery_agent.ingestion.figure_parser import describe_figure
 from discovery_agent.ingestion.pdf_parser import download_pdf, extract_figures, extract_text_chunks
 from discovery_agent.ingestion.pubmed_client import fetch_pubmed
@@ -124,6 +126,11 @@ def run_ingestion(query: str, max_results: int | None = None) -> int:
         if not new_chunks:
             return 0
 
-        return store.upsert(new_chunks)
+        count = store.upsert(new_chunks)
+        counts: dict[str, Counter] = {}
+        for chunk in new_chunks:
+            counts.setdefault(chunk.paper_id, Counter())[chunk.kind] += 1
+        record_papers(eligible_papers, query, {pid: dict(c) for pid, c in counts.items()})
+        return count
     finally:
         store.close()

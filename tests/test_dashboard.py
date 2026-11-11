@@ -27,20 +27,36 @@ def test_serialize_run_exports_run_data_as_json() -> None:
     assert exported == {"thread_id": "run-1", "updated_at": str(run["updated_at"])}
 
 
-def test_dashboard_exposes_refresh_and_run_exports(tmp_path: Path, monkeypatch) -> None:
+def test_every_dashboard_page_renders_persisted_run(tmp_path: Path, monkeypatch) -> None:
     run_dir = tmp_path / "runs" / "sample-run"
     run_dir.mkdir(parents=True)
-    (run_dir / "state.json").write_text(json.dumps({"status": "succeeded"}), encoding="utf-8")
+    state = {
+        "status": "succeeded",
+        "topic": "Sample topic",
+        "trace": [{"node": "literature_reviewer", "summary": "ok", "at": "2026-01-01"}],
+        "hypothesis": {"statement": "H", "citations": [{"paper_id": "p1", "title": "T", "quote": "q"}]},
+        "hypotheses": [{"statement": "H"}],
+        "attempts": [{"iteration": 1, "code": "pass", "reward": 1.0, "result": {"exit_code": 0}}],
+        "critic_report": {"verdict": "significant", "p_values": {"t": 0.01}},
+    }
+    (run_dir / "state.json").write_text(json.dumps(state), encoding="utf-8")
     (run_dir / "draft.md").write_text("# Sample draft", encoding="utf-8")
+    (tmp_path / "data").mkdir()
+    catalog = {"p1": {"id": "p1", "title": "Paper", "source": "arxiv", "authors": ["A"]}}
+    (tmp_path / "data" / "papers.json").write_text(json.dumps(catalog), encoding="utf-8")
     monkeypatch.chdir(tmp_path)
+    from dashboard.app import PAGES
 
-    app = AppTest.from_file(str(ROOT / "dashboard" / "app.py")).run()
+    app = AppTest.from_file(str(ROOT / "dashboard" / "app.py"), default_timeout=60)
+    for page in PAGES:
+        app.session_state["page"] = page
+        app.run()
+        assert not app.exception, page
+        assert not app.error, page
 
-    assert not app.exception
-    assert any(item.label == "Auto-refresh" for item in app.selectbox)
-    assert any(item.label == "Refresh now" for item in app.button)
-    download_labels = [item.label for item in app.sidebar if item.type == "download_button"]
-    assert download_labels == ["Export run JSON", "Export paper draft"]
+    app.session_state["page"] = "Reports"
+    app.run()
+    assert {b.label for b in app.get("download_button")} == {"Export run JSON", "draft.md"}
 
 
 def test_discover_runs_handles_missing_directory(tmp_path: Path) -> None:

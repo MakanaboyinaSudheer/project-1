@@ -19,7 +19,9 @@ def main() -> None:
 
     run = sub.add_parser("run", help="Run the full discovery loop on a research topic")
     run.add_argument("--topic", required=True)
-    run.add_argument("--thread-id", default=None, help="Resume a previous run")
+    run.add_argument("--thread-id", default=None, help="Run id; reusing one resumes that run")
+    run.add_argument("--ingest", type=int, default=0, help="First ingest up to N papers per source")
+    run.add_argument("--peer-reviewed-only", action="store_true", help="Retrieve only peer-reviewed papers")
 
     grade = sub.add_parser("grade", help="Evaluate a completed run against the literature holdout set")
     grade.add_argument("--run-dir", required=True, help="Path to the completed run directory")
@@ -32,7 +34,12 @@ def main() -> None:
     if args.command == "ingest":
         run_ingestion(args.query, max_results=args.max_results)
     elif args.command == "run":
-        run_discovery(args.topic, thread_id=args.thread_id)
+        if args.ingest:
+            print(f"Ingested {run_ingestion(args.topic, max_results=args.ingest)} new chunks.")
+        state = run_discovery(
+            args.topic, thread_id=args.thread_id, peer_reviewed_only=args.peer_reviewed_only
+        )
+        print(f"Run {state['thread_id']} finished: {state.get('status')}")
     elif args.command == "grade":
         print(json.dumps(grade_run(args.run_dir, args.holdout), indent=2))
     elif args.command == "check":

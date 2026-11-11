@@ -1,78 +1,86 @@
-"""Tests for M2.3 Hypothesis Generator node. Owner: Member 2."""
+"""Hypothesis Generator: citations must be grounded in retrieved literature."""
 
 from unittest.mock import MagicMock, patch
 
-from discovery_agent.agents.hypothesis_generator import Hypothesis, hypothesis_generator_node
+import pytest
+
+from discovery_agent.agents.hypothesis_generator import hypothesis_generator_node
+from discovery_agent.schemas import Citation, CriticReport, Hypothesis, RetrievedChunk
 
 
-@patch("discovery_agent.agents.hypothesis_generator.HYPOTHESIS_PROMPT")
-@patch("discovery_agent.agents.hypothesis_generator.get_llm")
-def test_reject_hallucinated_citations(mock_get_llm, mock_prompt):
-    """M2.3: Verify the generator rejects hallucinated citations and retries."""
+def _chunk(paper_id: str, text: str) -> RetrievedChunk:
+    return RetrievedChunk(
+        id=f"{paper_id}:abstract",
+        paper_id=paper_id,
+        text=text,
+        score=0.9,
+        metadata={"title": f"T {paper_id}"},
+    )
 
+
+def _hyp(*citations: Citation, statement: str = "H") -> Hypothesis:
+    return Hypothesis(
+        statement=statement, rationale="r", citations=list(citations), test_plan="t", expected_outcome="e"
+    )
+
+
+def _run(state, outputs):
+    chain = MagicMock()
+    chain.invoke.side_effect = outputs
+    with (
+        patch("discovery_agent.agents.hypothesis_generator.HYPOTHESIS_PROMPT") as prompt,
+        patch("discovery_agent.agents.hypothesis_generator.get_llm"),
+    ):
+        prompt.__or__.return_value = chain
+        return hypothesis_generator_node(state), chain
+
+
+STATE = {
+    "topic": "AI",
+    "thread_id": "t1",
+    "literature": [_chunk("pubmed:1", "Label noise hurts calibration.")],
+}
+
+
+def test_rejects_hallucinated_citations_and_retries():
+    bad = _hyp(Citation(paper_id="pubmed:99", title="fake", quote="x"))
+    good = _hyp(Citation(paper_id="pubmed:1", title="llm title", quote="Label noise hurts"), statement="ok")
+    result, chain = _run(STATE, [bad, good])
+
+    assert chain.invoke.call_count == 2
+    citation = result["hypothesis"].citations[0]
+    assert result["hypothesis"].statement == "ok"
+    assert citation.title == "T pubmed:1"  # title comes from the source, not the LLM
+    assert citation.quote == "Label noise hurts"
+
+
+def test_non_verbatim_quote_is_replaced_with_source_text():
+    paraphrase = _hyp(Citation(paper_id="pubmed:1", title="t", quote="noise is bad"))
+    result, _ = _run(STATE, [paraphrase])
+    assert result["hypothesis"].citations[0].quote == "Label noise hurts calibration."
+
+
+def test_refinement_receives_previous_hypothesis_and_critique():
+    cite = Citation(paper_id="pubmed:1", title="t", quote="q")
     state = {
-        "research_topic": "AI in healthcare",
-        "literature_summary": "Summary here",
-        "literature_context": [{"id": "valid_paper_1"}, {"id": "valid_paper_2"}],
+        **STATE,
+        "hypothesis": _hyp(cite, statement="old"),
+        "critic_report": CriticReport(verdict="not_significant", summary="Too vague"),
     }
+    result, chain = _run(state, [_hyp(cite, statement="new")])
 
-    hallucinated_output = Hypothesis(
-        title="Attempt 1: Bad",
-        reasoning="Includes a fake citation",
-        proposed_methodology="Mock methodology",
-        citations=["valid_paper_1", "hallucinated_paper_99"],
-    )
-
-    valid_output = Hypothesis(
-        title="Attempt 2: Good",
-        reasoning="Only valid citations",
-        proposed_methodology="Mock methodology",
-        citations=["valid_paper_2"],
-    )
-
-    mock_chain = MagicMock()
-    mock_chain.invoke.side_effect = [hallucinated_output, valid_output]
-    mock_prompt.__or__.return_value = mock_chain
-
-    result = hypothesis_generator_node(state)
-
-    assert mock_chain.invoke.call_count == 2
-    assert result["hypothesis"]["title"] == "Attempt 2: Good"
-    assert "hallucinated_paper_99" not in result["hypothesis"]["citations"]
+    inputs = chain.invoke.call_args[0][0]
+    assert "old" in inputs["previous_hypothesis"]
+    assert "Too vague" in inputs["feedback"]
+    assert result["hypotheses"][0].statement == "new"
 
 
-@patch("discovery_agent.agents.hypothesis_generator.HYPOTHESIS_PROMPT")
-@patch("discovery_agent.agents.hypothesis_generator.get_llm")
-def test_hypothesis_refinement_loop(mock_get_llm, mock_prompt):
-    """M2.5: Verify the hypothesis generator incorporates previous hypothesis and critic feedback."""
-    state = {
-        "research_topic": "Quantum machine learning",
-        "literature_summary": "QML overview.",
-        "literature_context": [{"id": "qml_paper_1"}],
-        "hypothesis": {
-            "title": "Old Hypothesis",
-            "reasoning": "...",
-            "proposed_methodology": "...",
-            "citations": [],
-        },
-        "final_report": "Critic Feedback: Methodology is too vague.",
-    }
+def test_no_literature_means_no_hypothesis():
+    with pytest.raises(ValueError):
+        _run({"topic": "AI", "literature": []}, [])
 
-    mock_output = Hypothesis(
-        title="Refined Hypothesis",
-        reasoning="Addressed critic feedback",
-        proposed_methodology="Specific QML methodology",
-        citations=["qml_paper_1"],
-    )
 
-    mock_chain = MagicMock()
-    mock_chain.invoke.return_value = mock_output
-    mock_prompt.__or__.return_value = mock_chain
-
-    result = hypothesis_generator_node(state)
-
-    invoke_args = mock_chain.invoke.call_args[0][0]
-    assert invoke_args["previous_hypothesis"] == state["hypothesis"]
-    assert invoke_args["feedback"] == state["final_report"]
-
-    assert result["hypothesis"]["title"] == "Refined Hypothesis"
+def test_gives_up_after_repeated_hallucination():
+    bad = _hyp(Citation(paper_id="nope", title="t", quote="q"))
+    with pytest.raises(ValueError):
+        _run(STATE, [bad, bad, bad])

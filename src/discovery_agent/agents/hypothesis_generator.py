@@ -1,89 +1,94 @@
-"""Hypothesis Generator node, grounded in peer-reviewed literature via RAG. Owner: Member 2."""
+"""Hypothesis Generator node, grounded in retrieved literature via RAG."""
 
 from langchain_core.prompts import ChatPromptTemplate
-from pydantic import BaseModel, Field
 
-from discovery_agent.graph.state import ResearchState
+from discovery_agent.graph.state import ResearchState, trace_event
 from discovery_agent.llm import get_llm
+from discovery_agent.schemas import Citation, Hypothesis
+from discovery_agent.telemetry.costs import CostTracker
 
-
-class Hypothesis(BaseModel):
-    """Structured output for the generated research hypothesis."""
-
-    title: str = Field(description="Title of the research hypothesis")
-    reasoning: str = Field(description="Scientific reasoning based on the literature")
-    proposed_methodology: str = Field(description="Proposed computational steps to test it")
-    citations: list[str] = Field(description="List of source IDs cited from the literature context")
-
+MAX_RETRIES = 3
 
 HYPOTHESIS_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "You are an expert AI researcher. Formulate a novel, testable hypothesis "
-            "based on the literature summary. If a previous hypothesis and critic feedback "
-            "are provided, you MUST explicitly refine the previous hypothesis to address the flaws. "
-            "ONLY cite source IDs explicitly provided in the Valid Context IDs list.",
+            "You are an expert AI researcher. Formulate one novel, computationally testable hypothesis "
+            "grounded in the literature. Cite ONLY paper_ids from the evidence list and quote them "
+            "verbatim. The test_plan must be runnable offline in Python on simulated or synthetic data. "
+            "If a previous hypothesis and critic feedback are given, refine it to address the feedback.",
         ),
         (
             "user",
-            "Topic: {topic}\n\n"
-            "Valid Context IDs: {context_ids}\n\n"
-            "Literature Summary:\n{summary}\n\n"
-            "Previous Hypothesis:\n{previous_hypothesis}\n\n"
-            "Critic Feedback:\n{feedback}\n\n"
+            "Topic: {topic}\n\nLiterature summary:\n{summary}\n\nEvidence:\n{evidence}\n\n"
+            "Previous hypothesis:\n{previous_hypothesis}\n\nCritic feedback:\n{feedback}\n\n"
             "{validation_errors}",
         ),
     ]
 )
 
 
+def _ground(citations: list[Citation], sources: dict[str, list]) -> tuple[list[Citation], list[str]]:
+    """Keep only citations of retrieved papers; replace non-verbatim quotes with real source text."""
+    grounded, invalid = [], []
+    for citation in citations:
+        chunks = sources.get(citation.paper_id)
+        if not chunks:
+            invalid.append(citation.paper_id)
+            continue
+        quote = citation.quote.strip()
+        if not quote or not any(quote in chunk.text for chunk in chunks):
+            quote = chunks[0].text[:300]
+        title = chunks[0].metadata.get("title") or citation.title
+        grounded.append(Citation(paper_id=citation.paper_id, title=title, quote=quote))
+    return grounded, invalid
+
+
 def hypothesis_generator_node(state: ResearchState) -> dict:
-    """Produce a structured Hypothesis whose every claim cites a retrieved peer-reviewed chunk.
-    Reject/regenerate if any citation's paper_id is not in state['literature_context']."""
-    topic = state.get("research_topic") or state.get("topic", "")
-    summary = state.get("literature_summary", "")
-    feedback = state.get("final_report", "None")
+    """Produce a Hypothesis whose citations all reference chunks in state['literature']."""
+    sources: dict[str, list] = {}
+    for chunk in state.get("literature", []):
+        sources.setdefault(chunk.paper_id, []).append(chunk)
+    if not sources:
+        raise ValueError("Cannot generate a hypothesis without retrieved literature")
 
-    previous_hypothesis = state.get("hypothesis") or "None"
+    previous = state.get("hypothesis")
+    report = state.get("critic_report")
+    inputs = {
+        "topic": state["topic"],
+        "summary": state.get("literature_summary", ""),
+        "evidence": "\n\n".join(
+            f"paper_id={pid} | {chunks[0].metadata.get('title', '')}\n{chunks[0].text[:1500]}"
+            for pid, chunks in sources.items()
+        ),
+        "previous_hypothesis": previous.model_dump_json() if previous else "None",
+        "feedback": f"{report.summary}\nIssues: {report.issues}" if report else "None",
+        "validation_errors": "",
+    }
+    tracker = CostTracker(run_id=state.get("thread_id", "local-run"))
+    chain = HYPOTHESIS_PROMPT | get_llm().with_structured_output(Hypothesis)
 
-    literature_context = state.get("literature_context", [])
-    valid_ids = {item.get("id") for item in literature_context if isinstance(item, dict) and "id" in item}
-
-    if not valid_ids:
-        valid_ids = {"mock_id_1", "mock_id_2"}
-
-    llm = get_llm().with_structured_output(Hypothesis)
-    chain = HYPOTHESIS_PROMPT | llm
-
-    max_retries = 3
-    validation_errors = ""
-    hypothesis_obj = None
-
-    for _ in range(max_retries):
-        hypothesis_obj = chain.invoke(
-            {
-                "topic": topic,
-                "context_ids": list(valid_ids),
-                "summary": summary,
-                "previous_hypothesis": previous_hypothesis,
-                "feedback": feedback,
-                "validation_errors": validation_errors,
+    for _ in range(MAX_RETRIES):
+        hypothesis = Hypothesis.model_validate(chain.invoke(inputs, config={"callbacks": [tracker]}))
+        citations, invalid = _ground(hypothesis.citations, sources)
+        if citations and not invalid:
+            hypothesis = hypothesis.model_copy(update={"citations": citations})
+            refinement = state.get("refinement_iteration", 0)
+            return {
+                "hypothesis": hypothesis,
+                "hypotheses": [hypothesis],
+                "trace": [
+                    trace_event(
+                        "hypothesis_generator",
+                        f"Hypothesis v{refinement + 1} with {len(citations)} verified citations.",
+                    )
+                ],
             }
+        inputs["validation_errors"] = (
+            f"Your previous answer cited unknown paper_ids {invalid} or none at all. "
+            f"Use only: {list(sources)}."
         )
-
-        invalid_citations = [c for c in hypothesis_obj.citations if c not in valid_ids]
-
-        if not invalid_citations:
-            break
-
-        validation_errors = (
-            "Error in previous attempt: The following citations are "
-            f"invalid/hallucinated: {invalid_citations}. "
-            "You must ONLY use IDs from the Valid Context IDs list."
-        )
-
-    return {"hypothesis": hypothesis_obj.model_dump()}
+    raise ValueError(f"Hypothesis generator failed to produce grounded citations in {MAX_RETRIES} tries")
 
 
 generate_hypothesis = hypothesis_generator_node

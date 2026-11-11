@@ -17,6 +17,7 @@ class ResearchState(TypedDict, total=False):
     # Input
     topic: str
     thread_id: str
+    peer_reviewed_only: bool
 
     # Literature Reviewer
     literature: list[RetrievedChunk]
@@ -24,6 +25,7 @@ class ResearchState(TypedDict, total=False):
 
     # Hypothesis Generator
     hypothesis: Hypothesis
+    hypotheses: Annotated[list[Hypothesis], operator.add]  # refinement history
 
     # Code Executor + self-debug loop
     code: str
@@ -42,6 +44,7 @@ class ResearchState(TypedDict, total=False):
 
     # Bookkeeping (dashboard reads these)
     status: Literal["running", "succeeded", "failed"]
+    error: str
     trace: Annotated[list[dict], operator.add]  # {"node", "summary", "at"}
     costs: Annotated[list[CostEvent], operator.add]
     memory_summary: str  # rolling compressed context (Week 3)

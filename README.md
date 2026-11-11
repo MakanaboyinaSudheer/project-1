@@ -46,9 +46,9 @@ the `discovery-sandbox` image and starts Milvus. You can browse Milvus with Attu
 ```bash
 docker compose up -d                       # start Milvus
 discovery-agent ingest --query "protein folding"
-discovery-agent run --topic "..."          # full discovery loop
+discovery-agent run --topic "..." [--ingest 10] [--peer-reviewed-only] [--thread-id ID]  # full loop; reusing an ID resumes it
 discovery-agent grade --run-dir runs/<id>   # evaluate a completed run against holdout papers
-streamlit run dashboard/app.py             # supervisor dashboard (live refresh and run/draft exports)
+streamlit run dashboard/app.py             # research workspace: launch, monitor, browse literature/hypotheses/experiments/reports
 pytest -m "not integration"                # unit tests
 pytest -m integration                      # needs Docker + Milvus
 docker compose down                        # stop Milvus (data persists in ./volumes)
