@@ -46,11 +46,13 @@ def _ground(citations: list[Citation], sources: dict[str, list]) -> tuple[list[C
 
 def hypothesis_generator_node(state: ResearchState) -> dict:
     """Produce a Hypothesis whose citations all reference chunks in state['literature']."""
+    # Grounding rule (ARCHITECTURE 4.2): only peer-reviewed papers may be cited.
     sources: dict[str, list] = {}
     for chunk in state.get("literature", []):
-        sources.setdefault(chunk.paper_id, []).append(chunk)
+        if chunk.metadata.get("peer_reviewed") is True:
+            sources.setdefault(chunk.paper_id, []).append(chunk)
     if not sources:
-        raise ValueError("Cannot generate a hypothesis without retrieved literature")
+        raise ValueError("No peer-reviewed literature retrieved; ingest PubMed papers for this topic first")
 
     previous = state.get("hypothesis")
     report = state.get("critic_report")

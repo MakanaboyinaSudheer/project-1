@@ -80,6 +80,9 @@ flowchart LR
   describes each image as a searchable `kind="figure"` chunk.
 - Retrieval uses maximal marginal relevance (MMR) over a larger candidate set and adds a
   bounded recency boost, while preserving the peer-reviewed-only filter.
+- Each ingestion merges paper metadata (title, authors, URL, chunk counts per kind) into
+  `data/papers.json`. Milvus stores only `paper_id`, so the retriever and dashboard read titles
+  and URLs from this catalog.
 - The Milvus collection `papers` has the fields `id, paper_id, kind, source, peer_reviewed,
   published_ts, text, vector(384)`, with a scalar index on `peer_reviewed` for filtered RAG.
 
@@ -153,9 +156,13 @@ disagree are flagged, and the recomputed values are used in the report.
 ### 4.6 Memory and long runs (`memory/`)
 - A LangGraph `SqliteSaver` checkpointer stores state per `thread_id` after every node,
   so a run survives crashes and restarts (`discovery-agent run --thread-id <id>`).
-- `memory.build_context` assembles each prompt within a token budget: system prompt,
-  `memory_summary`, the most recent N attempts verbatim, and the top-k literature.
-- `memory.compress` folds older attempts and trace entries into `memory_summary`.
+- After every node, `run_discovery` also writes a JSON snapshot to `runs/<thread_id>/state.json`.
+  A crash is recorded there (`status: failed`, `error`), and rerunning with the same thread id
+  resumes from the last checkpoint.
+- `memory.build_context` / `memory.compress` (token-budgeted context and rolling compression)
+  exist as utilities but are not wired into the graph: agents pass bounded slices of state
+  directly (the last 5 attempts and 8000 characters of stderr to the debugger, the top 12
+  literature chunks to the reviewer).
 
 ### 4.7 Synthesis (`synthesis/`)
 Jinja2 templates render `abstract.tex` (LaTeX `abstract` environment, `\cite{}` keys),
@@ -172,14 +179,16 @@ in the graph state.
   and a UTC timestamp per LLM call into `runs/<id>/costs.jsonl` (one JSON object per line).
   Known provider rates are configurable when constructing the tracker; unknown models are
   logged with zero estimated cost and a warning. Local Ollama models default to zero cost.
-- The dashboard reads the checkpoints and `runs/` to show: the run list, the logic tree (the trace),
-  citations with links, code attempts with diffs and rewards, the critic report, and costs.
+- The dashboard (`dashboard/app.py`) has eight pages: Overview, New discovery, Live run,
+  Literature, Hypotheses, Experiments, Reports, and Settings. It launches each run as a detached
+  `discovery-agent run` process and reads only persisted artifacts (`runs/<id>/state.json`,
+  `costs.jsonl`, `run.log`, `data/papers.json`), so runs and history survive dashboard restarts.
+  It binds to 127.0.0.1 by default (`.streamlit/config.toml`).
 
 ### 4.9 Evaluation (`evaluation/`)
 - `data/holdout.jsonl` contains ten recent arXiv papers and concise summaries.
   `evaluation.holdout.exclude_holdout_papers` removes matching IDs before ingestion; M1.4
-  must call this helper before embedding or indexing candidates. The current ingestion pipeline
-  is still a stub, so end-to-end exclusion awaits that integration.
+  calls this helper before embedding or indexing candidates.
 - `discovery-agent grade --run-dir runs/<id>` evaluates a completed run against that fixed set.
   It records embedding cosine similarity, a structured 0–5 LLM evidence-alignment score per
   paper, peer-reviewed citation validity, experiment success rate, critic verdict validity,

@@ -5,7 +5,7 @@ Demonstrate the end-to-end execution of the v0.1 LangGraph state machine, highli
 
 ## Prerequisites
 1. Check out the `develop` branch.
-2. Ensure the SQLite checkpointer volume exists (`mkdir -p volumes`).
+2. Start Milvus and ingest papers for the topic (`discovery-agent ingest --query "..."`).
 3. Export your LLM API keys.
 
 ## Demo Steps
@@ -20,9 +20,9 @@ Run the discovery CLI or execute a test script targeting `run_discovery` with a 
 
 ### Step 3: Hypothesis Generator (M2.3)
 - **Action:** Step into the `hypothesis_generator` node.
-- **Verification:** Print `state["hypothesis"]`. Emphasize that the output is strictly typed via Pydantic (`title`, `reasoning`, `proposed_methodology`, `citations`).
+- **Verification:** Print `state["hypothesis"]`. Emphasize that the output is strictly typed via Pydantic (`statement`, `rationale`, `citations`, `test_plan`, `expected_outcome`), and that every citation is a peer-reviewed paper from `state["literature"]`.
 - **Validation:** Demonstrate the citation validation retry loop by temporarily injecting a fake citation ID into the code and showing the LLM correcting it.
 
 ### Step 4: Routing & Stubs
 - **Action:** Show the state machine seamlessly routing to the remaining nodes (Code Executor, Critic, Synthesizer).
-- **Verification:** Prove the graph reaches `END` without crashing, successfully preserving the thread state in SQLite.
+- **Verification:** Prove the graph reaches `END` and that `runs/<thread_id>/state.json` and the SQLite checkpoint (`CHECKPOINT_DB`) hold the run state.

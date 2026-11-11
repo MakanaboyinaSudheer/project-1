@@ -13,3 +13,14 @@ LITERATURE_REVIEW_PROMPT = ChatPromptTemplate.from_messages(
         ("user", "Topic: {topic}\n\nLiterature Context:\n{context}"),
     ]
 )
+
+SUB_QUERY_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "Generate 2 to 4 short, specific literature-search queries that together cover the "
+            "research topic (methods, populations, outcomes, competing explanations).",
+        ),
+        ("user", "Topic: {topic}"),
+    ]
+)

@@ -8,13 +8,13 @@ from discovery_agent.agents.hypothesis_generator import hypothesis_generator_nod
 from discovery_agent.schemas import Citation, CriticReport, Hypothesis, RetrievedChunk
 
 
-def _chunk(paper_id: str, text: str) -> RetrievedChunk:
+def _chunk(paper_id: str, text: str, peer_reviewed: bool = True) -> RetrievedChunk:
     return RetrievedChunk(
         id=f"{paper_id}:abstract",
         paper_id=paper_id,
         text=text,
         score=0.9,
-        metadata={"title": f"T {paper_id}"},
+        metadata={"title": f"T {paper_id}", "peer_reviewed": peer_reviewed},
     )
 
 
@@ -84,3 +84,9 @@ def test_gives_up_after_repeated_hallucination():
     bad = _hyp(Citation(paper_id="nope", title="t", quote="q"))
     with pytest.raises(ValueError):
         _run(STATE, [bad, bad, bad])
+
+
+def test_preprints_cannot_be_cited():
+    state = {"topic": "AI", "literature": [_chunk("arxiv:1", "Preprint claim.", peer_reviewed=False)]}
+    with pytest.raises(ValueError, match="peer-reviewed"):
+        _run(state, [])

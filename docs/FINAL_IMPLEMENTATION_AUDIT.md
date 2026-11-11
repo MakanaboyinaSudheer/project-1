@@ -1,7 +1,7 @@
 # Final implementation audit
 
 Baseline: `main` @ `9a470aa` (develop is fully merged into it). Work branch: `final/integration`.
-Unit baseline before changes: 153 passed / 3 skipped. After: 159 passed / 3 skipped; ruff clean.
+Unit baseline before changes: 153 passed / 3 skipped. After: 162 passed / 3 skipped; ruff clean.
 
 ## Status matrix
 
@@ -9,8 +9,8 @@ Unit baseline before changes: 153 passed / 3 skipped. After: 159 passed / 3 skip
 |---|---|---|
 | ingestion (arxiv, pubmed, pdf, figures, pipeline) | Implemented, tested | Unchanged + persistent paper catalog `data/papers.json` (titles, authors, URLs, chunk counts by kind) |
 | retrieval (embeddings, Milvus store, MMR + recency) | Implemented, tested | Results enriched with real titles/URLs from the catalog (Milvus schema stores only `paper_id`) |
-| literature_reviewer | **Broken**: wrote `literature_context`, wasted an unused sub-query LLM call, no trace | Writes `literature`, fails loudly on an empty index, cost-tracked, traced |
-| hypothesis_generator | **Broken**: own `Hypothesis` schema incompatible with executor/critic/synthesizer; mock-ID citation fallback; validation never ran (checked dicts, got models) | Uses canonical `schemas.Hypothesis`; citations must match retrieved `paper_id`s (3 retries then error); titles taken from source; non-verbatim quotes replaced by real source text; refinement history kept |
+| literature_reviewer | **Broken**: wrote `literature_context`, wasted an unused sub-query LLM call, no trace | Expands the topic into 2–4 sub-queries, merges and dedupes results, writes `literature`, fails loudly on an empty index, cost-tracked, traced |
+| hypothesis_generator | **Broken**: own `Hypothesis` schema incompatible with executor/critic/synthesizer; mock-ID citation fallback; validation never ran (checked dicts, got models) | Uses canonical `schemas.Hypothesis`; only peer-reviewed papers may be cited; citations must match retrieved `paper_id`s (3 retries then error); titles taken from source; non-verbatim quotes replaced by real source text; refinement history kept |
 | code_executor, debugger, bandit, feedback, sandbox runner | Implemented, tested | Unchanged (debugger was never called before; now wired into the graph) |
 | critic (deterministic stats, Holm–Bonferroni, raw-data recompute) | Implemented, tested | Unchanged; LLM only appends methodology issues |
 | synthesizer / LaTeX / BibTeX / PDF | Implemented, tested | Unchanged |
@@ -26,7 +26,7 @@ Unit baseline before changes: 153 passed / 3 skipped. After: 159 passed / 3 skip
 - `tools/milvus_tools.py`, `utils/*.py`, `test_agent_tool.py`: scripts hard-coded to Docker-internal hosts and a different collection and embedding size (768 vs 384).
 
 ## Verification performed here
-- `pytest -m "not integration"`: 159 passed, 3 skipped. Graph tests cover success, debug loop, debug budget, refinement budget, crash then resume without re-execution, run isolation, and unsafe IDs. The dashboard test renders every page from a persisted run.
+- `pytest -m "not integration"`: 162 passed, 3 skipped. Graph tests cover success, debug loop, debug budget, refinement budget, crash then resume without re-execution, run isolation, and unsafe IDs. The dashboard test renders every page from a persisted run.
 - `streamlit run dashboard/app.py`: server starts, `/_stcore/health` returns `ok`.
 - `discovery-agent run` with Milvus down: fails with a clear error, persisted to `state.json` with `status: failed`.
 

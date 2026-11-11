@@ -10,7 +10,7 @@ the statistics, and writes LaTeX research drafts.
 - **[CONTRIBUTING.md](CONTRIBUTING.md):** branching, commits, PRs
 - **[PLATFORM_RUNBOOK.md](PLATFORM_RUNBOOK.md):** platform setup and verification
 - **[SECURITY_AUDIT.md](SECURITY_AUDIT.md):** sandbox controls and residual risks
-- **[M4_EVALUATION_REPORT.md](M4_EVALUATION_REPORT.md):** evaluation, synthesis, and dashboard report
+- **[docs/FINAL_IMPLEMENTATION_AUDIT.md](docs/FINAL_IMPLEMENTATION_AUDIT.md):** module status, verification, and remaining risks
 
 ## Prerequisites
 - Python **3.12**
