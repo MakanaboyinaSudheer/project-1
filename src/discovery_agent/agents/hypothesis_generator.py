@@ -1,20 +1,12 @@
 """Hypothesis Generator node, grounded in peer-reviewed literature via RAG. Owner: Member 2."""
 
 from langchain_core.prompts import ChatPromptTemplate
-from pydantic import BaseModel, Field
 
 from discovery_agent.graph.state import ResearchState
 from discovery_agent.llm import get_llm
 
-
-class Hypothesis(BaseModel):
-    """Structured output for the generated research hypothesis."""
-
-    title: str = Field(description="Title of the research hypothesis")
-    reasoning: str = Field(description="Scientific reasoning based on the literature")
-    proposed_methodology: str = Field(description="Proposed computational steps to test it")
-    citations: list[str] = Field(description="List of source IDs cited from the literature context")
-
+# Import the official global schemas to guarantee perfect LangGraph validation
+from discovery_agent.schemas import Hypothesis
 
 HYPOTHESIS_PROMPT = ChatPromptTemplate.from_messages(
     [
@@ -23,7 +15,10 @@ HYPOTHESIS_PROMPT = ChatPromptTemplate.from_messages(
             "You are an expert AI researcher. Formulate a novel, testable hypothesis "
             "based on the literature summary. If a previous hypothesis and critic feedback "
             "are provided, you MUST explicitly refine the previous hypothesis to address the flaws. "
-            "ONLY cite source IDs explicitly provided in the Valid Context IDs list.",
+            "Your output must exactly match the required schema:"
+            " statement, rationale, test_plan, expected_outcome, and citations. "
+            "For citations, provide the paper_id, title, and a supporting quote. "
+            "ONLY cite paper IDs explicitly provided in the Valid Context IDs list.",
         ),
         (
             "user",
@@ -53,6 +48,7 @@ def hypothesis_generator_node(state: ResearchState) -> dict:
     if not valid_ids:
         valid_ids = {"mock_id_1", "mock_id_2"}
 
+    # Bind the LLM directly to the official project schema
     llm = get_llm().with_structured_output(Hypothesis)
     chain = HYPOTHESIS_PROMPT | llm
 
@@ -72,18 +68,20 @@ def hypothesis_generator_node(state: ResearchState) -> dict:
             }
         )
 
-        invalid_citations = [c for c in hypothesis_obj.citations if c not in valid_ids]
+        # Validate nested Citation objects instead of strings
+        invalid_citations = [c.paper_id for c in hypothesis_obj.citations if c.paper_id not in valid_ids]
 
         if not invalid_citations:
             break
 
         validation_errors = (
-            "Error in previous attempt: The following citations are "
+            "Error in previous attempt: The following citation paper_IDs are "
             f"invalid/hallucinated: {invalid_citations}. "
             "You must ONLY use IDs from the Valid Context IDs list."
         )
 
-    return {"hypothesis": hypothesis_obj.model_dump()}
+    # Return the Pydantic object directly so LangGraph's AgentState accepts it seamlessly
+    return {"hypothesis": hypothesis_obj}
 
 
 generate_hypothesis = hypothesis_generator_node
