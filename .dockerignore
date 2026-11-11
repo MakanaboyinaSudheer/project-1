@@ -1,0 +1,5 @@
+volumes/
+.venv/
+__pycache__/
+.git/
+.env
