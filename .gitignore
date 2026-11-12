@@ -32,3 +32,4 @@ volumes/
 .idea/
 .DS_Store
 Thumbs.db
+ollama-linux-amd64.tar.zst

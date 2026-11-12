@@ -9,7 +9,7 @@ ast_serialize==0.12.1
 attrs==26.1.0
 biopython==1.88
 cachetools==7.2.1
-certifi==2026.7.22
+certifi>=2024.7.4
 cfgv==3.5.0
 charset-normalizer==3.5.2
 click==8.5.0
@@ -135,7 +135,7 @@ threadpoolctl==3.7.0
 tiktoken==0.14.0
 tokenizers==0.23.2
 toml==0.10.2
-torch==2.14.1
+torch>=2.4.0
 tqdm==4.70.1
 transformers==5.19.0
 triton==3.8.0

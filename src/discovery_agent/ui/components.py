@@ -18,7 +18,7 @@ def render_parallel_hypotheses(hypotheses: list[dict[str, Any]]):
 
     for idx, (col, hyp) in enumerate(zip(cols, hypotheses, strict=False)):
         with col:
-            angle = hyp.get("angle", f"Angle {idx+1}").title()
+            angle = hyp.get("angle", f"Angle {idx + 1}").title()
             st.markdown(f"### {angle}")
 
             # Use an expander to keep the UI clean if the content is long
