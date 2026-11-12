@@ -17,16 +17,21 @@ def test_reject_hallucinated_citations(mock_get_llm, mock_prompt):
     }
 
     hallucinated_output = Hypothesis(
-        title="Attempt 1: Bad",
-        reasoning="Includes a fake citation",
-        proposed_methodology="Mock methodology",
-        citations=["valid_paper_1", "hallucinated_paper_99"],
+        statement="Attempt 1: Bad",
+        rationale="Includes a fake citation",
+        test_plan="Mock methodology",
+        expected_outcome="Mock outcome",
+        citations=[
+            {"paper_id": "valid_paper_1", "title": "T", "quote": "Q"},
+            {"paper_id": "hallucinated_paper_99", "title": "T", "quote": "Q"},
+        ],
     )
 
     valid_output = Hypothesis(
         title="Attempt 2: Good",
         reasoning="Only valid citations",
-        proposed_methodology="Mock methodology",
+        test_plan="Mock methodology",
+        expected_outcome="Mock outcome",
         citations=["valid_paper_2"],
     )
 
@@ -50,19 +55,21 @@ def test_hypothesis_refinement_loop(mock_get_llm, mock_prompt):
         "literature_summary": "QML overview.",
         "literature_context": [{"id": "qml_paper_1"}],
         "hypothesis": {
-            "title": "Old Hypothesis",
-            "reasoning": "...",
-            "proposed_methodology": "...",
+            "statement": "Old Hypothesis",
+            "rationale": "...",
+            "test_plan": "...",
+            "expected_outcome": "...",
             "citations": [],
         },
         "final_report": "Critic Feedback: Methodology is too vague.",
     }
 
     mock_output = Hypothesis(
-        title="Refined Hypothesis",
-        reasoning="Addressed critic feedback",
-        proposed_methodology="Specific QML methodology",
-        citations=["qml_paper_1"],
+        statement="Refined Hypothesis",
+        rationale="Addressed critic feedback",
+        test_plan="Specific QML methodology",
+        expected_outcome="Expected success",
+        citations=[{"paper_id": "qml_paper_1", "title": "T", "quote": "Q"}],
     )
 
     mock_chain = MagicMock()

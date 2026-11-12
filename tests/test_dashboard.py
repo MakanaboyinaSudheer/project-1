@@ -37,7 +37,7 @@ def test_dashboard_exposes_refresh_and_run_exports(tmp_path: Path, monkeypatch) 
     app = AppTest.from_file(str(ROOT / "dashboard" / "app.py")).run()
 
     assert not app.exception
-    assert any(item.label == "Auto-refresh" for item in app.selectbox)
+    assert any(item.label == "Auto-refresh" for item in app.checkbox)
     assert any(item.label == "Refresh now" for item in app.button)
     download_labels = [item.label for item in app.sidebar if item.type == "download_button"]
     assert download_labels == ["Export run JSON", "Export paper draft"]
