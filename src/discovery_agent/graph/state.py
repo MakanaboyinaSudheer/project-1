@@ -20,6 +20,7 @@ class ResearchState(TypedDict, total=False):
 
     # Literature Reviewer
     literature: list[RetrievedChunk]
+    literature_context: list[RetrievedChunk]
     literature_summary: str
 
     # Hypothesis Generator
