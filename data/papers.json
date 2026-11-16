@@ -1,0 +1,419 @@
+{
+  "arxiv:2611.14518v1": {
+    "id": "arxiv:2611.14518v1",
+    "source": "arxiv",
+    "title": "Toward Foundation Detection Models via Example-Based Grounding in EM-DETR",
+    "abstract": "DeepLearning (DL)-based Computer-Aided Diagnostic (CAD) systems have shown great promise in supporting clinicians, but their performance heavily depends on the availability of large, well-annotated datasets. In medical lesion detection, the scarcity of comprehensive, stan dardized annotations and the heterogeneity of existing datasets limit the development of robust foundation models. In this work, we introduce a novel approach to building a multi-domain foundation model for le sion detection by integrating diverse medical image datasets annotated for both anatomical structures and abnormalities. We first propose a student-teacher training strategy to effectively combine datasets with heterogeneous label spaces, mitigating catastrophic forgetting, and im proving feature learning. In addition, building on our previously pro posed example-based EM-DETR framework, we adapt it to jointly learn from multiple domain-specific datasets, enabling fine-grained, example driven detection across modalities. Our model achieves state-of-the-art (SOTA) results, with image-level AUC scores exceeding previous SOTA by 1% point on four key findings in CXRs. We achieve a leading mAP50 in CXRs and mammography, surpassing EM-DETR trained on a single dataset by 2-3% points. This approach paves the way for scalable foundation models in medical imaging that leverage heterogeneous data while maintaining robust and generalizable performance.",
+    "authors": [
+      "Sheethal Bhat",
+      "Bogdan Georgescu",
+      "Awais Mansoor",
+      "Florin C. Ghesu",
+      "Sasa Grbic",
+      "Andreas Maier"
+    ],
+    "published": "2026-11-10T18:59:17Z",
+    "url": "http://arxiv.org/abs/2611.14518v1",
+    "pdf_url": "https://arxiv.org/pdf/2611.14518v1",
+    "peer_reviewed": false,
+    "queries": [
+      "machine learning sepsis prediction electronic health records"
+    ],
+    "chunks": {
+      "abstract": 1,
+      "body": 39
+    },
+    "ingested_at": "2026-11-11T15:29:23.828875+00:00",
+    "updated_at": "2026-11-11T15:29:23.828875+00:00"
+  },
+  "arxiv:2611.14516v1": {
+    "id": "arxiv:2611.14516v1",
+    "source": "arxiv",
+    "title": "TorchCurves: Differentiable Parametric Curves",
+    "abstract": "We present TorchCurves, a PyTorch library that treats vector-valued parametric curves as learnable primitives. Its central operation maps batches of scalar inputs to points on curves represented in B-spline or Legendre polynomial bases, with differentiation through both inputs and coefficients. Curve coefficients can be optimized jointly with the surrounding model or produced by another network. The library provides trainable modules, reusable basis modules, and a functional interface, supporting applications ranging from continuous feature embeddings to Kolmogorov-Arnold networks and functional regression. Its implementation combines classical evaluation algorithms with vectorized PyTorch operations, emphasizing readability and maintainability without custom hardware kernels. Timing experiments compare curve evaluation against NumPy and SciPy and KAN training against EfficientKAN across a range of problem sizes. The results illustrate where this generality remains computationally practical and where overhead is substantial. Library is available on GitHub at https://github.com/alexshtf/torchcurves.",
+    "authors": [
+      "Alex Shtoff"
+    ],
+    "published": "2026-11-10T18:58:52Z",
+    "url": "http://arxiv.org/abs/2611.14516v1",
+    "pdf_url": "https://arxiv.org/pdf/2611.14516v1",
+    "peer_reviewed": false,
+    "queries": [
+      "machine learning sepsis prediction electronic health records"
+    ],
+    "chunks": {
+      "abstract": 1,
+      "body": 34
+    },
+    "ingested_at": "2026-11-11T15:29:23.828875+00:00",
+    "updated_at": "2026-11-11T15:29:23.828875+00:00"
+  },
+  "arxiv:2611.14515v1": {
+    "id": "arxiv:2611.14515v1",
+    "source": "arxiv",
+    "title": "AutoScaffold: AI-Guided Scaffolding for Reinforcement Learning of Language Models",
+    "abstract": "Reinforcement learning with verifiable rewards (RLVR) produces rich training experience, yet outcome rewards reduce each attempt to a single number and leave most of this information unused. Training-time scaffolds, such as strategies or hints added to the prompt during training, offer a natural way to turn this information into guidance, but their design and adaptation are largely left to humans and tailored to specific domains. We introduce AutoScaffold, a unified AI-for-AI framework that turns a student's training experience into adaptive scaffolds, with minimal domain-specific information and no human intervention during training. A frozen teacher periodically examines this experience, diagnoses bottlenecks, and designs scaffolds in two forms: (i) strategies shared across a class of tasks and (ii) hints for individual hard tasks, adjusting the content and amount of support as the student learns. The scaffolds are removed at evaluation. We apply the same framework to ALFWorld, search-based QA, mathematical reasoning, and GPU kernel generation. When evaluated without scaffolds, students trained with AutoScaffold outperform those trained with the corresponding RL baselines in all four domains, with gains of 7.2 points in ALFWorld success and 4.0 points in average QA exact match. On GPU kernel generation, AutoScaffold increases the fraction of tasks with a correct kernel that runs faster than the PyTorch reference by up to 5.0 points. On math, our student surpasses QuestA's reported accuracy using approximately one-third as many student training steps. Analyses show that the teacher identifies a different failure in each task class and shifts its scaffolds from step-by-step workflows to targeted fixes as the student improves, and that its revised scaffolds help the student learn more than keeping the previous scaffold or using no scaffold.",
+    "authors": [
+      "Zijian Zhang",
+      "Rizhen Hu",
+      "Jiangweizhi Peng",
+      "Shiyang Li",
+      "Sujay Bhatt",
+      "Sihan Zeng",
+      "Mingyi Hong"
+    ],
+    "published": "2026-11-10T18:58:46Z",
+    "url": "http://arxiv.org/abs/2611.14515v1",
+    "pdf_url": "https://arxiv.org/pdf/2611.14515v1",
+    "peer_reviewed": false,
+    "queries": [
+      "machine learning sepsis prediction electronic health records"
+    ],
+    "chunks": {
+      "abstract": 1,
+      "body": 130
+    },
+    "ingested_at": "2026-11-11T15:29:23.828875+00:00",
+    "updated_at": "2026-11-11T15:29:23.828875+00:00"
+  },
+  "arxiv:2611.14514v1": {
+    "id": "arxiv:2611.14514v1",
+    "source": "arxiv",
+    "title": "Contrastive Discovery: Open-Ended Scientific Discovery over Competing Explanations",
+    "abstract": "LLM agents are increasingly used for open-ended, data-driven scientific discovery, yet most of them evaluate hypotheses pointwise, testing an empirical claim $h$ only against its complement $\\neg h$. When evidence rejects $h$, the agent learns that one explanation is unlikely but not which alternative the evidence supports. To recover that alternative, we introduce Contrastive Discovery, which replaces the single hypothesis with a contrast set, a scientific question paired with mutually exclusive and collectively exhaustive competing explanations. Each experiment is scored by how its evidence redistributes belief across the set, and the question is resolved when belief concentrates on one explanation. Because contrast sets change only the unit an agent proposes and scores, an existing agent can use them to re-evaluate evidence it has already collected or to guide its search. Across six domains, $89\\%$ of the pointwise candidates with the largest belief shifts are rejections. On the same evidence, contrast sets resolve $73\\%$ of these candidates to a specific alternative. When contrast sets guide search, the agent resolves $67\\%$ more questions than pointwise surprisal under the same experiment budget. In a blinded study, $38$ human experts chose the same explanation on $78\\%$ of resolved questions and on $82\\%$ of questions where the pointwise agent rejected its hypothesis and stopped. Together, these results support explicit competing explanations as a way for discovery agents to resolve more scientific questions from the same evidence and validation budget.",
+    "authors": [
+      "Ziang Liu",
+      "James J. Kim",
+      "Yijia Dai",
+      "Jennifer J. Sun"
+    ],
+    "published": "2026-11-10T18:58:43Z",
+    "url": "http://arxiv.org/abs/2611.14514v1",
+    "pdf_url": "https://arxiv.org/pdf/2611.14514v1",
+    "peer_reviewed": false,
+    "queries": [
+      "machine learning sepsis prediction electronic health records"
+    ],
+    "chunks": {
+      "abstract": 1,
+      "body": 245
+    },
+    "ingested_at": "2026-11-11T15:29:23.828875+00:00",
+    "updated_at": "2026-11-11T15:29:23.828875+00:00"
+  },
+  "arxiv:2611.14511v1": {
+    "id": "arxiv:2611.14511v1",
+    "source": "arxiv",
+    "title": "Pyrite: Building and Benchmarking Protein-Ligand Pose Ranking Agents",
+    "abstract": "Predicting how a ligand binds to its target is central to small-molecule drug discovery. Modern cofolding models can generate diverse candidate poses, but reliably ranking these candidates remains challenging. We introduce Pyrite, a pairwise pose-ranking benchmark comprising 1,500 pose pairs across diverse protein-ligand complexes. Expert chemists equipped with 3D visualization tools and physics-based scores perform near chance, highlighting the difficulty of interpreting available chemical signals. To investigate automated ranking, we introduce PyriteRep, a structured representation of molecular geometry, protein-ligand interactions, and physicochemical scores, and develop two LLM-based agents: PyriteReasoner, which directly compares poses through text-based reasoning, and PyriteFeaturizer, which generates executable code to construct features for logistic regression, optionally incorporating features derived from LLM subcalls. These agents achieve up to 67% and 74% accuracy, respectively, exceeding observed expert performance. LLM-guided feature discovery generally outperforms direct reasoning, while Group Relative Policy Optimization (GRPO) improves open-weight models, enabling them to match or surpass closed-source frontier models in our evaluations. These results establish Pyrite as a challenging test of pose-ranking ability and highlight LLM-guided feature discovery as a promising approach to interpret and combine the outputs of computational chemistry tools.",
+    "authors": [
+      "Megha Srivastava",
+      "Michael H. Lim",
+      "Allison M. Keys",
+      "Pranav Murugan",
+      "Nate Gruver"
+    ],
+    "published": "2026-11-10T18:56:32Z",
+    "url": "http://arxiv.org/abs/2611.14511v1",
+    "pdf_url": "https://arxiv.org/pdf/2611.14511v1",
+    "peer_reviewed": false,
+    "queries": [
+      "machine learning sepsis prediction electronic health records"
+    ],
+    "chunks": {
+      "abstract": 1,
+      "body": 116
+    },
+    "ingested_at": "2026-11-11T15:29:23.828875+00:00",
+    "updated_at": "2026-11-11T15:29:23.828875+00:00"
+  },
+  "arxiv:2611.14508v1": {
+    "id": "arxiv:2611.14508v1",
+    "source": "arxiv",
+    "title": "When Does the Real Wiring Win? Testing connectome structure-function claims against unmeasured physiology",
+    "abstract": "Connectome-constrained models are often used to argue that a measured wiring diagram outperforms shuffled or rewired wiring, and hence that structure shapes function. Such comparisons can confound wiring with how the models are tuned: a connectome fixes who connects to whom, not the excitability, gains or plasticity rates the model also needs, and modellers often tune these until the real-wiring model works. We separate three estimands: physiology tuned on the real wiring and transferred to nulls (P1), each wiring tuned on its own (P2), and P2 restricted to physiology consistent with independent data (P3). The biases involved are known in machine learning (under-tuned baselines, inherited weights, winner's curse); we measure what they do to biological conclusions, using synthetic ground truth, placebo nulls and three Drosophila circuit models. Some claims survive every protocol we test: segregated reward and punishment dopamine improves learning, and head-direction topography is required for a persistent bump. Others do not. In the mushroom body, the real Kenyon-cell output wiring beats a cross-subtype identity shuffle by 0.09 under P1 and P2 but loses to it by 0.09 under P3 (95% CIs exclude zero; held-out runs confirm). The verdict is set by the share of alpha'beta' cells among active Kenyon cells, which P1 selects low; at the share implied by imaging (about 44%) the real-wiring model fails to learn, exposing a model inadequacy rather than a deficit of the fly's wiring. In flyvis, P1 penalises a mirrored connectome, which has a constructed solution within 0.07 (median) of the real error, more than a spatially shuffled one in 50 of 50 members; the ranking survives ten-fold longer retraining but depends on the checkpoint at fifty-fold. A credible structural claim needs matched optimisation, data-constrained physiology and a model that still works there.",
+    "authors": [
+      "Yeyuan Liu"
+    ],
+    "published": "2026-11-10T18:55:48Z",
+    "url": "http://arxiv.org/abs/2611.14508v1",
+    "pdf_url": "https://arxiv.org/pdf/2611.14508v1",
+    "peer_reviewed": false,
+    "queries": [
+      "machine learning sepsis prediction electronic health records"
+    ],
+    "chunks": {
+      "abstract": 1,
+      "body": 90
+    },
+    "ingested_at": "2026-11-11T15:29:23.828875+00:00",
+    "updated_at": "2026-11-11T15:29:23.828875+00:00"
+  },
+  "arxiv:2611.14505v1": {
+    "id": "arxiv:2611.14505v1",
+    "source": "arxiv",
+    "title": "Continual-ARC: Measuring Skill Acquisition over a Working Lifetime",
+    "abstract": "Agent harnesses have emerged as a promising mechanism for continual learning, alongside test-time parametric learning. However, the current benchmarks have several limitations: they generally focus on a single applied domain, serve each instance only once, and assume a single family of learner, so memory-based and weight-based systems are rarely compared on the same scale. We propose Continual-ARC, a lifelong stream built from the three ARC-AGI editions, whose tasks need no domain knowledge. The same tasks return after dormant gaps with fresh instances, while new tasks keep arriving. On each instance, the learner may pay for demonstrations, submit answers, or act inside the harness, with retries permitted on incorrect submissions, which are paid for. Each instance is scored based on the share of this feedback budget consumed. Since a learner may keep anything between instances, memory-based and weight-based systems are scored on the same scale. After the stream, the learner is frozen and tested on fresh instances of the tasks it met, which measures memorization, and on unseen tasks, which measures generalization. We run an agent harness with frozen weights, with and without persistence, on Qwen3.5-9B and GLM-5.3 Flash, comparing them with two prompting floors, a program-induction method and Qwen3.5-9B's weights trained to imitate GLM-5.3 Flash. Persistence in the harness generally does not improve memorization unless provided with explicit expert guidance. Most harness-based methods still learn less than a floor that simply caches each task's demonstrations, across all models we tested. No harness-based method gains on unseen tasks, whereas weight-based learning shows substantial gains. This opens the door to future weight-based continual learning that could teach models to drive harnesses in new domains.",
+    "authors": [
+      "Daniel Lenton"
+    ],
+    "published": "2026-11-10T18:55:01Z",
+    "url": "http://arxiv.org/abs/2611.14505v1",
+    "pdf_url": "https://arxiv.org/pdf/2611.14505v1",
+    "peer_reviewed": false,
+    "queries": [
+      "machine learning sepsis prediction electronic health records"
+    ],
+    "chunks": {
+      "abstract": 1,
+      "body": 233
+    },
+    "ingested_at": "2026-11-11T15:29:23.828875+00:00",
+    "updated_at": "2026-11-11T15:29:23.828875+00:00"
+  },
+  "arxiv:2611.14504v1": {
+    "id": "arxiv:2611.14504v1",
+    "source": "arxiv",
+    "title": "Emergent Biological Capabilities in a Foundation Model for Molecular Interactions",
+    "abstract": "Foundation models trained on large unlabeled corpora develop emergent capabilities, tasks that go beyond the training objective. We extend this paradigm to multimodal biology with Bonbon, a foundation model for molecular interactions trained on approximately 3.2 trillion tokens of paired protein-ligand sequences. From a single representation space, Bonbon exhibits three zero-shot emergent capabilities at hierarchical levels of resolution: functional (mechanism of action), residue (binding site localization, including orthosteric/allosteric discrimination), and bond (covalent versus non-covalent engagement). All three capabilities generalize to out-of-distribution complexes. Bonbon was trained on protein-ligand sequences alone, without any task-specific supervision and without structural coordinates. We conducted controlled scaling experiments across six model scales from 42M to 1.6B parameters; every capability evaluated shows a sharp jump at the largest scale on continuous metrics, even as pretraining loss decreases smoothly. This demonstrates that loss-based scaling laws alone are insufficient to predict when zero-shot emergent capabilities become available. The capabilities reported here emerge after training at a 1:2,000 parameter-to-token ratio to accommodate the sparsity of paired biological interaction data. The same frozen representations achieve state-of-the-art binding and affinity prediction at five orders of magnitude greater speed than co-folding methods. In prospective wet-lab validation across nine disease targets spanning seven protein families, Bonbon achieves a 61.5% dose-response hit rate on de novo compounds, yielding structurally novel molecules not previously reported to inhibit these proteins, including for out-of-distribution targets.",
+    "authors": [
+      "Adi Mashiach"
+    ],
+    "published": "2026-11-10T18:53:01Z",
+    "url": "http://arxiv.org/abs/2611.14504v1",
+    "pdf_url": "https://arxiv.org/pdf/2611.14504v1",
+    "peer_reviewed": false,
+    "queries": [
+      "machine learning sepsis prediction electronic health records"
+    ],
+    "chunks": {
+      "abstract": 1,
+      "body": 124
+    },
+    "ingested_at": "2026-11-11T15:29:23.828875+00:00",
+    "updated_at": "2026-11-11T15:29:23.828875+00:00"
+  },
+  "pubmed:42843401": {
+    "id": "pubmed:42843401",
+    "source": "pubmed",
+    "title": "Machine Learning in Causal Effect Estimation and Causal Evaluation of ML-Enabled Interventions in Nursing-Related Research: A Scoping Review.",
+    "abstract": "Machine learning (ML) informs nursing practice, but prediction cannot establish intervention or workflow effects. Aim To map ML use within causal effect estimation and causal evaluations of ML-enabled interventions in nursing and midwifery. Eight electronic sources were searched for reports published January 2015-June 2026, followed by backward citation searching. Eligibility required a causal estimand, corresponding identification strategy, substantive ML role, and nursing or midwifery relevance. Two reviewers independently screened records and full texts. Fifteen studies (17 reports) were included. Five addressed acute deterioration or sepsis; others covered care prioritization, falls, post-discharge care, and nurse- or midwife-led services. Five used ML within causal effect estimation to examine longitudinal and spillover effects, treatment-effect heterogeneity, and targeting strategies. Ten evaluated ML-enabled interventions or workflows; reported favorable effects on mortality, care escalation, message-review time, and nursing processes, while several controlled estimates were null or imprecise. Evidence remains small and methodologically uneven. Future studies should align estimands, identification strategies, analytic methods, and workflows and evaluate model-plus-workflow effects on nursing processes and patient outcomes.",
+    "authors": [
+      "Dimitrios Kosmidis",
+      "Georgios Vlachopoulos",
+      "Abdulqadir J Nashwan",
+      "Rafael Lima Rodrigues de Carvalho",
+      "Breno Santos Araujo",
+      "Dimitra Armeni",
+      "Eleni Sertaridou",
+      "Sotiria Koutsouki"
+    ],
+    "published": "2026-12-01T00:00:00",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/42843401/",
+    "pdf_url": null,
+    "peer_reviewed": true,
+    "queries": [
+      "machine learning sepsis prediction electronic health records"
+    ],
+    "chunks": {
+      "abstract": 1
+    },
+    "ingested_at": "2026-11-11T15:29:23.828875+00:00",
+    "updated_at": "2026-11-11T15:29:23.828875+00:00"
+  },
+  "pubmed:43001824": {
+    "id": "pubmed:43001824",
+    "source": "pubmed",
+    "title": "Artificial Intelligence in Pediatric Hospital Medicine: Foundations, Clinical Applications, and Emerging Case Uses.",
+    "abstract": "Artificial intelligence (AI) is rapidly transforming health care and has important implications for pediatric hospital medicine. Advances in machine learning and large language models have enabled applications that support patient care in the areas of clinical documentation, decision making, and prognostic modeling. Pediatric AI systems leverage diverse data sources, including electronic health records, medical imaging, physiologic monitoring, wearable devices, and genomic data. Current applications include AI-powered scribes, chart summarization, clinical decision support, prediction of sepsis and clinical deterioration, precision pharmacotherapy, rare disease diagnosis, and mental health interventions. These technologies have demonstrated potential to reduce clinician workload, enhance diagnostic accuracy, and facilitate earlier therapeutic interventions. However, significant challenges remain, including limited and heterogeneous pediatric datasets by virtue of age and developmental characteristics in children, bias, privacy concerns, lack of representativeness, and the need for rigorous validation and oversight. As AI adoption expands, pediatric hospitalists require foundational knowledge of AI principles and limitations to ensure safe, equitable, and effective implementation. With appropriate governance and multidisciplinary collaboration, AI has the potential to improve pediatric inpatient outcomes and health care delivery.",
+    "authors": [
+      "Shashi Sahai",
+      "Allison L Ball",
+      "Srinivasan Suresh"
+    ],
+    "published": "2026-11-01T00:00:00",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/43001824/",
+    "pdf_url": null,
+    "peer_reviewed": true,
+    "queries": [
+      "machine learning sepsis prediction electronic health records"
+    ],
+    "chunks": {
+      "abstract": 1
+    },
+    "ingested_at": "2026-11-11T15:29:23.828875+00:00",
+    "updated_at": "2026-11-11T15:29:23.828875+00:00"
+  },
+  "pubmed:42900705": {
+    "id": "pubmed:42900705",
+    "source": "pubmed",
+    "title": "Variability in automated sepsis case detection: a systematic analysis of implementation methods in clinical data repositories.",
+    "abstract": "OBJECTIVE: To systematically review and characterize methodological heterogeneity in sepsis case detection using the Medical Information Mart for Intensive Care III (MIMIC-III) and eICU-CRD databases. MATERIALS AND METHODS: We conducted a PRISMA-guided systematic review of PubMed and Web of Science (publication years 2016-2024). Studies were eligible if they applied the SOFA-based Sepsis-3 definition to MIMIC-III or eICU-CRD, provided at least one explicit label-calculation detail, reported a traceable detection rate, and met further criteria detailed in the PRISMA flow diagram. We classified each study by study type and unit of analysis (patients, admissions, or ICU stays) and extracted methodological details on sepsis case detection across 6 domains. For studies with available source code, we additionally examined code structure and repository dependencies to identify methodological decisions across these domains. RESULTS: Of 396 publications screened, 64 met inclusion criteria and 12 provided source code. Sepsis detection rates ranged from 3.4% to 65.2% in MIMIC-III and from 9.8% to 47.9% in eICU-CRD. Substantial variability persisted among studies using identical cohort definitions within both databases (MIMIC-III: 16.9%-42.2%; eICU-CRD: 13.9%-31.4%). In a generalized linear mixed model, between-study heterogeneity was extreme (overall \u03c4\u00b2\u22480.79; 95% prediction interval for a new study's detection rate 5%-63%), and study-level characteristics-including database, study type, infection detection method, code availability, and unit of analysis-explained only a small proportion of this variance (\u22489%), with no characteristic reaching statistical significance. The overall proportion of studies reporting methodological details varied by domain: SOFA calculation (53.1%), infection detection methods (42.2%), temporal windows (37.5%), aggregation methods (26.6%), and missing-data handling (17.2%). Source code analysis identified 321 implementation decisions, revealing heterogeneity in baseline SOFA definitions (SOFA = 0 vs dynamic baseline), temporal windows (infection-centered vs ICU-admission-centered) and infection detection methods (antibiotic-culture matching vs APACHE-based diagnosis). Dependencies among several MIMIC-III repositories suggested propagation of implementation decisions across studies. DISCUSSION: Clinically validated sepsis definitions yield substantially different detection rates across studies using identical datasets. Statistical modeling showed that this variability is driven almost entirely by between-study implementation differences rather than sampling error or study characteristics. CONCLUSION: To improve reproducibility in sepsis research and the robustness of sepsis prediction models, we recommend standardized reporting of sepsis case detection methodology and the publication of version-controlled source code.",
+    "authors": [
+      "Falk Meyer-Eschenbach",
+      "Ren\u00e9 Schmiedler",
+      "Johannes von Stoephasius",
+      "Camille Zhang",
+      "Luis Kronfli",
+      "Nicolas Frey",
+      "Anatol-Fiete N\u00e4her",
+      "Jacques Ehret",
+      "Johanna Nothacker",
+      "Christof von Kalle",
+      "Severin Kohler",
+      "Elias Gr\u00fcnewald",
+      "Andreas Edel",
+      "Oliver Kumpf",
+      "Jon Barrenetxea",
+      "Felix Balzer"
+    ],
+    "published": "2026-10-20T00:00:00",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/42900705/",
+    "pdf_url": null,
+    "peer_reviewed": true,
+    "queries": [
+      "machine learning sepsis prediction electronic health records"
+    ],
+    "chunks": {
+      "abstract": 1
+    },
+    "ingested_at": "2026-11-11T15:29:23.828875+00:00",
+    "updated_at": "2026-11-11T15:29:23.828875+00:00"
+  },
+  "pubmed:42308952": {
+    "id": "pubmed:42308952",
+    "source": "pubmed",
+    "title": "From development to clinical practice: deployment of an interoperable and secure ML-based CDSS to aid in the early detection of sepsis.",
+    "abstract": "Recent research has increasingly focused on machine learning (ML) models for early disease prediction, yet practical frameworks for integrating these models into clinical workflows remain limited. BIAlert is a microservices-based framework designed to operate as a real-time early-warning system for ML-driven disease prediction in hospitalised patients. It can be deployed remotely on physical or virtual servers and is composed of coupled microservices that communicate through Apache Kafka queues, using HL7 FHIR resources as the message format. The system comprises four core components: (1) the Connector, which ingests raw hospital data and converts it into standardised healthcare formats; (2) the Writer, which stores FHIR-formatted data in an internal database and triggers the prediction pipeline; (3) the Predictor, which hosts ML models and generates patient-specific alerts; and (4) the Model Evaluator, which supports prospective monitoring of model performance. Alerts are displayed through the BIAlert user interface and can also be integrated directly into the electronic health record (EHR). BIAlert is currently deployed and operating in real-time clinical settings in two hospitals, demonstrating its feasibility as a scalable and interoperable solution for ML-based clinical decision support.",
+    "authors": [
+      "Ana Serrano Garc\u00eda",
+      "David L\u00f3pez",
+      "Eric Macias-Fassio",
+      "Santiago Salas-Sosa",
+      "Iv\u00e1n Pascual",
+      "Cristina Pruenza",
+      "Marcio Borges-Sa",
+      "Andr\u00e9s Giglio",
+      "Jaime Cruz-Rojo",
+      "Rodrigo Pacheco-Puig"
+    ],
+    "published": "2026-10-01T00:00:00",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/42308952/",
+    "pdf_url": null,
+    "peer_reviewed": true,
+    "queries": [
+      "machine learning sepsis prediction electronic health records"
+    ],
+    "chunks": {
+      "abstract": 1
+    },
+    "ingested_at": "2026-11-11T15:29:23.828875+00:00",
+    "updated_at": "2026-11-11T15:29:23.828875+00:00"
+  },
+  "pubmed:42776357": {
+    "id": "pubmed:42776357",
+    "source": "pubmed",
+    "title": "Development and evaluation of machine learning-based prediction-modelling for initial vancomycin serum concentrations in septic ICU patients using clinical health record data.",
+    "abstract": "BACKGROUND: Sepsis remains a life-threatening condition with highly heterogeneous and dynamic pathophysiology, limiting the effectiveness of uniform therapeutic strategies. Beyond timely source control, antimicrobial therapy represents the only causal treatment option. Vancomycin is widely used for treatment of Gram-positive infections; however, optimal dosing in septic patients is challenging due to pronounced pharmacokinetic variability and substantial interindividual heterogeneity. Underdosing may promote antimicrobial resistance, whereas overdosing increases the risk of toxicity. This study aimed to develop and validate a machine learning-based prediction model to support individualized vancomycin dosing using routinely available clinical data. METHODS: This single-center retrospective study included adult sepsis patients admitted to the intensive care unit, using routinely collected data from the hospital's electronic medical records. Patients were eligible if they received a vancomycin loading dose followed by continuous infusion and had at least one measured serum concentration. Three machine learning models-elastic net regression, random forest, and XGBoost-were developed to predict the initial vancomycin serum concentration. To minimize bias and enhance generalizability, model training, hyperparameter tuning, and performance evaluation were conducted using a stratified nested cross-validation approach. Model performance was compared with seven commonly used population pharmacokinetic models. RESULTS: The developed best performing elastic net model achieved a notable improvement with an average RMSE of 6.19, compared to 7.83 for the best pharmacokinetic model highlighting the potential of early and individualized dosing supported by a machine learning model. Final model analysis revealed that noradrenaline administration, together with classical pharmacokinetic parameters including body weight, serum creatinine, and the presence of chronic kidney disease, significantly influenced predictive performance. CONCLUSIONS: This machine learning-based approach for predicting initial vancomycin serum concentrations outperforms conventional PK models and enables more precise, individualized dosing prior to the availability of therapeutic drug monitoring results. By integrating key clinical variables, the model facilitates data-driven decision-making in sepsis care and underscores the potential of machine learning to advance personalized antimicrobial therapy.",
+    "authors": [
+      "Robin Grugel",
+      "Britta Westhus",
+      "Hartmuth Nowak",
+      "Michael Adamzik",
+      "Tim Rahmel",
+      "Martin Eisenacher"
+    ],
+    "published": "2026-09-23T00:00:00",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/42776357/",
+    "pdf_url": null,
+    "peer_reviewed": true,
+    "queries": [
+      "machine learning sepsis prediction electronic health records"
+    ],
+    "chunks": {
+      "abstract": 1
+    },
+    "ingested_at": "2026-11-11T15:29:23.828875+00:00",
+    "updated_at": "2026-11-11T15:29:23.828875+00:00"
+  },
+  "pubmed:42751007": {
+    "id": "pubmed:42751007",
+    "source": "pubmed",
+    "title": "Artificial intelligence and machine learning in transplantation surgery care pathway.",
+    "abstract": "Artificial intelligence (AI) and machine learning (ML) are increasingly applied across the transplantation pathway, offering advances in preoperative planning, perioperative management, and postoperative recovery. In preoperative care, deep learning algorithms improve anatomical assessment, volumetry, and graft weight estimation, while ML-based functional status evaluation and urgency scoring refine candidate selection. Predictive models incorporating metabolic and physiological data further support surgical eligibility and targeted prehabilitation strategies. Perioperatively, ML models outperform conventional approaches in predicting massive transfusion, intraoperative haemorrhage, and acute kidney injury, with explainable outputs enhancing interpretability and clinical trust. Robotic and AI-assisted surgical platforms demonstrate functional equivalence or superiority to conventional methods, reducing intraoperative complications and accelerating recovery, particularly in high-risk cohorts. Postoperatively, ML-driven models enable early prediction of sepsis, pneumonia, and graft dysfunction, while longitudinal markers such as the recipient-to-donor estimated glomerular filtration rate ratio and novel imaging or biomarker-based approaches inform long-term graft monitoring. Optimised perioperative strategies, including analgesic regimens and fluid management, further enhance donor recovery and rehabilitation outcomes. Cross-cutting innovations include imaging-based AI applications such as hyperspectral imaging for real-time graft viability assessment and deep learning for automated histopathological evaluation, which improve diagnostic speed, accuracy, and reproducibility. Multimodal models integrating electronic health records, intraoperative signals, ultrasound, and histology provide dynamic, system-wide insights into graft function and rejection risk, bridging diagnostic, prognostic, and therapeutic decision-making. AI and ML thus hold substantial potential to personalise transplant care and improve outcomes. Their translation into practice, however, requires rigorous validation, dataset diversity, and strong ethical and regulatory governance.",
+    "authors": [
+      "Kavyesh Vivek",
+      "Vassilios Papalois"
+    ],
+    "published": "2026-09-18T00:00:00",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/42751007/",
+    "pdf_url": null,
+    "peer_reviewed": true,
+    "queries": [
+      "machine learning sepsis prediction electronic health records"
+    ],
+    "chunks": {
+      "abstract": 1
+    },
+    "ingested_at": "2026-11-11T15:29:23.828875+00:00",
+    "updated_at": "2026-11-11T15:29:23.828875+00:00"
+  },
+  "pubmed:42735002": {
+    "id": "pubmed:42735002",
+    "source": "pubmed",
+    "title": "Machine Learning-Based Prediction of Culture-Confirmed Neonatal Sepsis in a Tertiary Neonatal Intensive Care Unit: Retrospective Cohort Study.",
+    "abstract": "BACKGROUND: Neonatal sepsis remains a major cause of neonatal morbidity and mortality in low- and middle-income countries (LMICs). Early diagnosis is challenging because of nonspecific clinical manifestations and delays in laboratory confirmation. Machine learning (ML) approaches using structured electronic health record (EHR) data may improve early risk stratification in neonatal intensive care units (NICUs). OBJECTIVE: This study aimed to evaluate ML models for predicting culture-confirmed neonatal sepsis among neonates admitted to a tertiary NICU in Jordan, with the objective of addressing diagnostic gaps in resource-limited settings. Specifically, we aimed to identify key predictors through feature importance analysis, evaluate model performance with class-imbalanced data, and propose strategies to improve interpretability and generalizability in LMICs. METHODS: A retrospective cohort study was conducted using structured EHRs of 3274 neonates admitted to a tertiary NICU in Jordan between 2018 and 2024. Neonates who underwent blood culture testing were included. The dataset was divided into training (n=2619, 80%) and testing (n=655, 20%) subsets using stratified sampling. Three ML models-Extreme Gradient Boosting (XGBoost), decision trees, and neural networks-were trained using clinical, laboratory, and demographic variables. Class imbalance was addressed using the synthetic minority oversampling technique (SMOTE) applied to the training dataset. Model performance was evaluated using accuracy, sensitivity, specificity, and the area under the receiver operating characteristic curve (AUC). RESULTS: Among 3274 neonates included in the study, the XGBoost model demonstrated the best predictive performance on the independent test set (n=655, 20%), achieving an accuracy of 94% (616/655 correct predictions, 95% CI 92% to 96%), sensitivity of 98% (95/97 sepsis cases correctly identified, 95% CI 96% to 99%), and an AUC of 0.98 (95% CI 0.97 to 0.99). Decision trees provided interpretable classification rules with moderate performance, whereas neural networks showed lower discriminative ability, with an AUC of 0.81 (95% CI 0.78 to 0.84). Important predictive features included C-reactive protein, platelet count, and gestational age. CONCLUSIONS: XGBoost demonstrated strong predictive performance in this retrospective cohort, supporting its potential as a foundation for future prospective clinical decision support tools. External validation and prospective studies are required before clinical implementation.",
+    "authors": [
+      "Eman Badran",
+      "Oraib Al-Smadi",
+      "Loiy T Algazo",
+      "Alaa T Al Ghazo",
+      "Arwa Al Anber",
+      "Areej Sharaqa",
+      "Lena Abu-Argoub",
+      "Shatha Al Jaberi",
+      "Abdulrahman Alhanbali",
+      "Taimein Yacoub",
+      "Shahd Rihan",
+      "Hala Al-Jaberi"
+    ],
+    "published": "2026-09-14T00:00:00",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/42735002/",
+    "pdf_url": null,
+    "peer_reviewed": true,
+    "queries": [
+      "machine learning sepsis prediction electronic health records"
+    ],
+    "chunks": {
+      "abstract": 1
+    },
+    "ingested_at": "2026-11-11T15:29:23.828875+00:00",
+    "updated_at": "2026-11-11T15:29:23.828875+00:00"
+  },
+  "pubmed:42707855": {
+    "id": "pubmed:42707855",
+    "source": "pubmed",
+    "title": "Artificial intelligence for early sepsis detection and dynamic prognostication in onco-critical care.",
+    "abstract": "Critically ill cancer patients have a unique physiological profile marked by severe immunosuppression, frailty, and multimorbidity, making traditional tools like Acute Physiology and Chronic Health Evaluation II or Sequential Organ Failure Assessment often inadequate for accurate risk assessment. This review explores artificial intelligence's potential to transform onco-critical care from reactive to predictive management. We will synthesize literature on two key applications: Early sepsis detection in critically ill cancer patients and refining mortality prediction models to guide ethical care. The analysis will show how dynamic machine learning models, unlike static scores, use vital signs, lab trends, and unstructured machine learning data to detect deterioration hours before clinical decompensation. The review will also examine barriers to adoption, highlighting the need for explainable artificial intelligence to build clinician trust and address data heterogeneity across cancer populations. Ultimately, it will suggest that analytics can transform oncology intensive care unit care, balancing aggressive treatments and palliative care. While focusing on cancer patients, some evidence from general intensive care unit populations will be identified as extrapolated with caution, given different pathophysiology.",
+    "authors": [
+      "Prashant Sirohiya",
+      "Prateek Maurya",
+      "Sakshi Arora",
+      "Brajesh Kumar Ratre",
+      "Ram Singh",
+      "Balbir Kumar"
+    ],
+    "published": "2026-09-09T00:00:00",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/42707855/",
+    "pdf_url": null,
+    "peer_reviewed": true,
+    "queries": [
+      "machine learning sepsis prediction electronic health records"
+    ],
+    "chunks": {
+      "abstract": 1
+    },
+    "ingested_at": "2026-11-11T15:29:23.828875+00:00",
+    "updated_at": "2026-11-11T15:29:23.828875+00:00"
+  }
+}
